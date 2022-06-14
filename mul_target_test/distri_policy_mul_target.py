@@ -4,8 +4,8 @@
 # @FileName: distri_policy.py
 # @Software: PyCharm
 import tensorflow as tf
-from RL_algorithm_package.rddpg.distribution_policy.distri_actor_critic_net import test_actor as actor
-from RL_algorithm_package.rddpg.mul_target_test.logs import Logs
+
+from distribution_policy.distri_actor_critic_net import test_actor as actor
 
 
 class maddpg_policy:

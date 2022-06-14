@@ -5,12 +5,11 @@
 # @Software: PyCharm
 import time
 
-from matplotlib import pyplot as plt
-import os
 import numpy as np
-from RL_algorithm_package.rddpg.policy.policy import maddpg_policy
-from RL_algorithm_package.rddpg.script.mpe_env import mpe_env
-from RL_algorithm_package.rddpg.policy.convert_obs import convert
+
+from policy.convert_obs import convert
+from policy.policy import maddpg_policy
+from script.mpe_env import mpe_env
 
 SEED = 65535
 ACTION_SPAN = 0.5

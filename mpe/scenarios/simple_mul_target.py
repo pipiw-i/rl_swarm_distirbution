@@ -6,11 +6,13 @@
 """
 使用训练好的无人机策略，在多个目标上进行测试
 """
-import numpy as np
-from RL_algorithm_package.rddpg.mpe.core import World, Agent, Landmark
-from RL_algorithm_package.rddpg.mpe.scenario import BaseScenario
 import copy
-from RL_algorithm_package.rddpg.mul_target_test.logs import Logs
+
+import numpy as np
+
+from mpe.core import World, Agent, Landmark
+from mpe.scenario import BaseScenario
+from mul_target_test.logs import Logs
 
 cam_range = 4  # 视角范围
 

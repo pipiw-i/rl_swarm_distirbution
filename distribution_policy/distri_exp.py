@@ -3,9 +3,10 @@
 # @Author :  wangshulei
 # @FileName: distri_exp.py
 # @Software: PyCharm
-import pandas as pd
 import numpy as np
-from RL_algorithm_package.rddpg.distribution_policy.exp import Exp
+import pandas as pd
+
+from distribution_policy.exp import Exp
 
 
 class SharedExp(Exp):

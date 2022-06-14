@@ -4,14 +4,14 @@
 # @FileName: algo_mul_target_test.py
 # @Software: PyCharm
 import copy
-import os
 
 import numpy as np
-from RL_algorithm_package.rddpg.mul_target_test.boids_policy import boids_policy
-from RL_algorithm_package.rddpg.mul_target_test.RL_policy import RL_policy
-from RL_algorithm_package.rddpg.mul_target_test.mpe_mul_target_env import mpe_env
-from RL_algorithm_package.rddpg.mul_target_test.logs import Logs
 from tqdm import tqdm
+
+from mul_target_test.RL_policy import RL_policy
+from mul_target_test.boids_policy import boids_policy
+from mul_target_test.logs import Logs
+from mul_target_test.mpe_mul_target_env import mpe_env
 
 SEED = 65535
 ACTION_SPAN = 0.5

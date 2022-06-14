@@ -3,12 +3,11 @@
 # @Author :  wangshulei
 # @FileName: env_test.py
 # @Software: PyCharm
-from RL_algorithm_package.rddpg.mpe.environment import MultiAgentEnv
-import RL_algorithm_package.rddpg.mpe.scenarios as scenarios
-from RL_algorithm_package.rddpg.script.utils import space_n_to_shape_n
-from RL_algorithm_package.rddpg.policy.actor_critic_net import critic, actor
 import numpy as np
-import tensorflow as tf
+
+import mpe.scenarios as scenarios
+from mpe.environment import MultiAgentEnv
+from script.utils import space_n_to_shape_n
 
 
 class mpe_env:

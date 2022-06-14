@@ -3,7 +3,7 @@
 # @Author :  wangshulei
 # @FileName: RL_policy.py
 # @Software: PyCharm
-from RL_algorithm_package.rddpg.mul_target_test.distri_policy_mul_target import maddpg_policy
+from mul_target_test.distri_policy_mul_target import maddpg_policy
 
 
 class RL_policy:

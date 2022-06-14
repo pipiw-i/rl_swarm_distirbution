@@ -3,8 +3,9 @@
 # @Author :  wangshulei
 # @FileName: convert_obs.py
 # @Software: PyCharm
-from RL_algorithm_package.rddpg.policy.lstm import Lstm
 import tensorflow as tf
+
+from policy.lstm import Lstm
 
 
 class convert:

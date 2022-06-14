@@ -6,10 +6,12 @@
 """
 使用训练好的无人机策略，使用任意数目的无人机进行目标分配上进行测试
 """
-import numpy as np
-from RL_algorithm_package.rddpg.mpe.core import World, Agent, Landmark
-from RL_algorithm_package.rddpg.mpe.scenario import BaseScenario
 import copy
+
+import numpy as np
+
+from mpe.core import World, Agent, Landmark
+from mpe.scenario import BaseScenario
 
 cam_range = 4  # 视角范围
 

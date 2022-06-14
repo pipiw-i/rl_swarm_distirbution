@@ -14,10 +14,12 @@
 动作,act:   ① 是否执行攻击，action_dim = 5,[True or False,down,up,right,left]
               最前面是是否攻击的判断，如果攻击，后面的数据才会生效
 """
-import numpy as np
-from RL_algorithm_package.rddpg.mpe.core import World, Agent, Landmark
-from RL_algorithm_package.rddpg.mpe.scenario import BaseScenario
 import copy
+
+import numpy as np
+
+from mpe.core import World, Agent, Landmark
+from mpe.scenario import BaseScenario
 
 cam_range = 4  # 视角范围
 
@@ -274,7 +276,6 @@ class Scenario(BaseScenario):
             # 相当于通讯范围无限
             other_pos.append(other.state.p_pos - agent.state.p_pos)
         mean_other_pos = np.mean(other_pos, axis=0)
-        np.divide()
         # 可能他的周围根本没有飞行器，那么就以他为中心
         obs = np.concatenate([np.array([self.attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
         return obs

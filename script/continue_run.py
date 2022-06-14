@@ -3,13 +3,15 @@
 # @Author :  wangshulei
 # @FileName: run.py
 # @Software: PyCharm
-from matplotlib import pyplot as plt
 import os
+
 import numpy as np
-from RL_algorithm_package.rddpg.policy.policy import maddpg_policy
-from RL_algorithm_package.rddpg.script.mpe_env import mpe_env
-from RL_algorithm_package.rddpg.script.lstm_exp import SharedExp
-from RL_algorithm_package.rddpg.policy.convert_obs import convert
+from matplotlib import pyplot as plt
+
+from policy.convert_obs import convert
+from policy.policy import maddpg_policy
+from script.lstm_exp import SharedExp
+from script.mpe_env import mpe_env
 
 SEED = 65535
 ACTION_SPAN = 0.5

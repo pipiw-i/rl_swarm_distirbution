@@ -3,9 +3,9 @@
 # @Author :  wangshulei
 # @FileName: mpe_env.py
 # @Software: PyCharm
-from RL_algorithm_package.rddpg.mul_target_test.environment_mul_target import MultiAgentEnv
-import RL_algorithm_package.rddpg.mpe.scenarios as scenarios
-from RL_algorithm_package.rddpg.script.utils import space_n_to_shape_n
+import mpe.scenarios as scenarios
+from mul_target_test.environment_mul_target import MultiAgentEnv
+from script.utils import space_n_to_shape_n
 
 
 class mpe_env:

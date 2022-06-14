@@ -3,12 +3,11 @@
 # @Author :  wangshulei
 # @FileName: env_test.py
 # @Software: PyCharm
-from RL_algorithm_package.rddpg.mpe.environment_distribution import MultiAgentEnv
-from RL_algorithm_package.rddpg.mpe.environment_distribution_s_reward import MultiAgentEnv as MultiAgentEnv_s
-import RL_algorithm_package.rddpg.mpe.scenarios as scenarios
-from RL_algorithm_package.rddpg.script.utils import space_n_to_shape_n
 import numpy as np
-import tensorflow as tf
+
+import mpe.scenarios as scenarios
+from mpe.environment_distribution_s_reward import MultiAgentEnv as MultiAgentEnv_s
+from script.utils import space_n_to_shape_n
 
 
 class mpe_env:

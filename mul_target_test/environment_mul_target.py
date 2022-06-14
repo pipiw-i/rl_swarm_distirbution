@@ -1,8 +1,10 @@
-import gym
-from gym import spaces
-import numpy as np
-from RL_algorithm_package.rddpg.mpe.multi_discrete import MultiDiscrete
 import copy
+
+import gym
+import numpy as np
+from gym import spaces
+
+from mpe.multi_discrete import MultiDiscrete
 
 # update bounds to center around agent
 cam_range = 4  # 视角范围
@@ -418,7 +420,6 @@ class MultiAgentEnv(gym.Env):
 
         results = []
         for i in range(len(self.viewers)):
-            from RL_algorithm_package.rddpg.mpe import rendering  # 加载rendering文件
             pos_destroyed = np.zeros(self.world.dim_p)
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)

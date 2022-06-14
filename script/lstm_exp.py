@@ -4,10 +4,10 @@
 # @FileName: lstm_exp.py
 # @Software: PyCharm
 
-import tensorflow as tf
-import pandas as pd
 import numpy as np
-from RL_algorithm_package.rddpg.script.exp import Exp
+import pandas as pd
+
+from script.exp import Exp
 
 
 class SharedExp(Exp):

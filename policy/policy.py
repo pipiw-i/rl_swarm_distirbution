@@ -3,12 +3,14 @@
 # @Author :  wangshulei
 # @FileName: policy.py
 # @Software: PyCharm
-import numpy as np
 import os
+
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from RL_algorithm_package.rddpg.policy.actor_critic_net import actor
-from RL_algorithm_package.rddpg.policy.actor_critic_net import critic
+
+from policy.actor_critic_net import actor
+from policy.actor_critic_net import critic
 
 
 class maddpg_policy:
