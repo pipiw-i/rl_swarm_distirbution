@@ -8,14 +8,15 @@ policy 测试文件
 """
 import copy
 import datetime
-import time
-from matplotlib import pyplot as plt
 import os
+
 import numpy as np
-from RL_algorithm_package.rddpg.distribution_policy.distri_policy import maddpg_policy
-from RL_algorithm_package.rddpg.distribution_policy.mpe_env import mpe_env
-from RL_algorithm_package.rddpg.distribution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
-from RL_algorithm_package.rddpg.distribution_policy.distri_exp import SharedExp
+from matplotlib import pyplot as plt
+
+from distribution_policy.distri_exp import SharedExp
+from distribution_policy.distri_policy import maddpg_policy
+from distribution_policy.mpe_env import mpe_env
+from distribution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
 
 SEED = 65535
 ACTION_SPAN = 0.5
