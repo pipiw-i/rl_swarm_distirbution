@@ -121,20 +121,40 @@ class MultiAgentEnv(gym.Env):
 
     # step  this is  env.step()
     def step(self, action_n_landmark_attack_agent_index_dic):
-        action_n, landmark_attack_agent_index_dic = action_n_landmark_attack_agent_index_dic
+        action_n, landmark_attack_agent_index_dic, reassign_goals, landmark_attack_agent_index_dic_list\
+            = action_n_landmark_attack_agent_index_dic
         attack_landmarks = list(landmark_attack_agent_index_dic.keys())
         all_landmarks = self.world.landmarks
         self.agents = self.world.policy_agents
         # 根据对目标物的攻击，更改目标以及无人机的状态
-        for attack_landmark in attack_landmarks:
-            attack_this_landmark_agent_index = landmark_attack_agent_index_dic.get(attack_landmark)
-            attack_this_landmark_agent_number = len(attack_this_landmark_agent_index)
-            attack_landmark = np.array(attack_landmark)
-            if 0 < attack_this_landmark_agent_number <= 3:
-                for world_landmark in all_landmarks:
-                    if (abs(world_landmark.state.p_pos - attack_landmark) < 1e-3).all():
+        for world_landmark in all_landmarks:
+            attack_agent_number = 0
+            for landmark_agent in landmark_attack_agent_index_dic_list:
+                attack_landmark = list(landmark_agent.keys())[0]
+                attack_this_landmark_agent_index = []
+                attack_landmark = np.array(attack_landmark)
+                if (abs(world_landmark.state.p_pos - attack_landmark) < 1e-3).all():
+                    attack_agent_number += len(list(landmark_agent.values())[0])
+                    for agent_index in list(landmark_agent.values())[0]:
+                        attack_this_landmark_agent_index.append(agent_index)
+                    if 0 < attack_agent_number <= 3:
                         world_landmark.been_attacked = True
-                        world_landmark.color = np.array([0.99, 0.25, 0.25])
+                        if attack_agent_number == 1:
+                            world_landmark.color_list = [np.array([1, 1, 1]),
+                                                         np.array([0.75, 0.25, 0.25]),
+                                                         np.array([1, 1, 1]),
+                                                         np.array([1, 1, 1])]
+
+                        if attack_agent_number == 2:
+                            world_landmark.color_list = [np.array([1, 1, 1]),
+                                                         np.array([1, 1, 1]),
+                                                         np.array([1, 1, 1]),
+                                                         np.array([0.75, 0.25, 0.25])]
+                        if attack_agent_number == 3:
+                            world_landmark.color_list = [np.array([1, 1, 1]),
+                                                         np.array([1, 1, 1]),
+                                                         np.array([0.75, 0.25, 0.25]),
+                                                         np.array([1, 1, 1])]
                 for world_agent in self.agents:
                     if world_agent.index_number in attack_this_landmark_agent_index:
                         world_agent.is_destroyed = True
@@ -142,6 +162,17 @@ class MultiAgentEnv(gym.Env):
                         world_agent.attack_goal = attack_landmark
                         world_agent.collide = False
                         world_agent.color = np.array([0.99, 0.25, 0.25])
+        # 根据目标分配的情况，决定是否重分配
+        if reassign_goals:
+            # 对于已分配的所有目标来说
+            for landmark_agent in landmark_attack_agent_index_dic_list:
+                landmark_d = list(landmark_agent.keys())[0]
+                agent_d = list(landmark_agent.values())[0]
+                if len(agent_d) == 1:
+                    for landmark in all_landmarks:
+                        if abs(landmark.state.p_pos - np.array(landmark_d)).all() < 1e-3:
+                            landmark.been_attacked = False
+
         obs_n = []
         # 根据第一个动作值，来决定后续的动作
         new_action_n = []
@@ -317,17 +348,16 @@ class MultiAgentEnv(gym.Env):
         # 因为是采用了shared_viewer，所以这里只有一个，如果不是，则有很多个
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
-
             if self.viewers[i] is None:
                 # import rendering only if we need it (and don't import for headless machines)
                 # from gym.envs.classic_control import rendering
-                from RL_algorithm_package.rddpg.mpe import rendering  # 加载rendering文件
+                from mpe import rendering  # 加载rendering文件
                 self.viewers[i] = rendering.Viewer(700, 700)  # 建立一个window窗口，作为显示界面(白色画布)
         # create rendering geometry  创建渲染几何体
         if self.render_geoms is None:
             # import rendering only if we need it (and don't import for headless machines)
             # from gym.envs.classic_control import rendering  仅当我们需要时才从gym导入渲染（对于headless machines不导入）
-            from RL_algorithm_package.rddpg.mpe import rendering  # 加载rendering文件
+            from mpe import rendering  # 加载rendering文件
             self.render_geoms = []
             self.render_geoms_xform = []
 
@@ -337,11 +367,12 @@ class MultiAgentEnv(gym.Env):
             # self.render_geoms.append(geom)
 
             for entity in self.world.entities:  # 对于所有的物体，包括智能体以及障碍物
-                geom = rendering.make_circle(entity.size)  # 画一个size大小的圆
-                xform = rendering.Transform()  # 建立一个位置的映射，使画在中心的圆能够映射到
+                geom = None
+                xform = None
                 entity_comm_geoms = []
-
                 if 'agent' in entity.name:
+                    geom = rendering.make_circle(1.5 * entity.size)  # 画一个size大小的圆
+                    xform = rendering.Transform()  # 建立一个位置的映射，使画在中心的圆能够映射到
                     # 探索区域
                     geom_search = rendering.make_circle(entity.search_size, filled=False)
                     geom_search.add_attr(xform)
@@ -370,6 +401,8 @@ class MultiAgentEnv(gym.Env):
                             entity_comm_geoms.append(comm)
 
                 elif 'landmark' in entity.name:
+                    geom = rendering.make_capsule(2.5 * entity.size, 2.5 * entity.size)  # 画一个size大小的圆
+                    xform = rendering.Transform()  # 建立一个位置的映射，使画在中心的圆能够映射到
                     geom.set_color(*entity.color)
                     if entity.channel is not None:
                         dim_c = self.world.dim_c
@@ -468,7 +501,9 @@ class MultiAgentEnv(gym.Env):
                                 color, color, color)
                     agent_number = e
                 elif 'landmark' in entity.name:  # landmark
-                    self.render_geoms[2 * agent_number + e + 2].set_color(*entity.color, alpha=1.0)
+                    # self.render_geoms[2 * agent_number + e + 2].set_color(*entity.color, alpha=1.0)
+                    for index, gs in enumerate(self.render_geoms[2 * agent_number + e + 2].gs):
+                        gs.set_color(*entity.color_list[index], alpha=1.0)  # 对前面建立的圆加上color
                     if entity.channel is not None:
                         for ci in range(self.world.dim_c):
                             color = 1 - entity.channel[ci]

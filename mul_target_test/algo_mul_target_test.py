@@ -167,6 +167,9 @@ def policy_run(env, number_agent, load_file, need_render):
     agent_policy = AgentPolicy(agent_number=number_agent, load_file=load_file).init_policy()
     obs_n = env.mpe_env.reset()
     landmark_attack_agent_index_dic_list = []
+    reassign_goals = False
+    gaols_finish = False
+    agent_finish = False
     for t in tqdm(range(1000)):
         # 决策攻击的无人机
         if need_render:
@@ -195,7 +198,8 @@ def policy_run(env, number_agent, load_file, need_render):
             else:
                 real_action.append(copy.deepcopy(action))
         # print(f"landmark_attack_agent_index_dic is {landmark_attack_agent_index_dic}")
-        new_obs_n = env.mpe_env.step([real_action, landmark_attack_agent_index_dic])
+        new_obs_n = env.mpe_env.step([real_action, landmark_attack_agent_index_dic, reassign_goals,
+                                      landmark_attack_agent_index_dic_list])
 
         attack_landmarks = list(landmark_attack_agent_index_dic.keys())
         for attack_landmark in attack_landmarks:
@@ -204,17 +208,19 @@ def policy_run(env, number_agent, load_file, need_render):
             if 0 < attack_this_landmark_agent_number <= 3:
                 landmark_attack_agent_index_dic_list.append(landmark_attack_agent_index_dic)
         obs_n = new_obs_n
-
         if len(landmark_attack_agent_index_dic_list) == number_gaols:
-            print("finish")
-            # break
+            gaols_finish = True
         destroyed_number_count = 0
         for a, _, _, _, _, _, _, _, _ in new_obs_n:
             if a.is_destroyed:
                 destroyed_number_count += 1
         if destroyed_number_count == number_agent:
-            print("finish")
-            #  break
+            agent_finish = True
+        if agent_finish:
+            pass
+        elif gaols_finish and not agent_finish:
+            reassign_goals = True
+
     return landmark_attack_agent_index_dic_list
 
 
@@ -229,8 +235,8 @@ if __name__ == '__main__':
     result_logger = Logs(logger_name='result_logs', log_file_name='result_logs_6_6_17')
     for i in range(2, 3):
         all_distributions = {}
-        number_UAVs = 8 + 32 * i
-        number_gaols = 4 + 16 * i
+        number_UAVs = 8 + 2 * i
+        number_gaols = 4 + 1 * i
         all_number_agent_attack_mean = []
         r_env, r_number_agent, r_load_file, r_need_render = run_mpe(
             load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_17',
@@ -249,7 +255,8 @@ if __name__ == '__main__':
                         if all_goal_distributions.get(key_item, 0) == 0:
                             all_goal_distributions[key_item] = distribution.get(key_item)
                         else:
-                            continue
+                            for agent_index in distribution.get(key_item):
+                                all_goal_distributions[key_item].append(agent_index)
             # 统计这个轮次的平均值以及每个回合的分布情况
             str_logs = f"当前轮数{j}_无人机数目{number_UAVs}_目标数目{number_gaols}\n"
             number_agent_attack_mean = 0

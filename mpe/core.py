@@ -1,5 +1,4 @@
 import numpy as np
-import seaborn as sns
 
 
 # physical/external base state of all entites
@@ -94,6 +93,8 @@ class Landmark(Entity):
         super(Landmark, self).__init__()
         # 如果这个值为True，那么说明这个目标已经被摧毁，那么就不再考虑这个目标了
         self.been_attacked = False
+        # 三种颜色
+        self.color_list = None
 
 
 # properties of agent entities
@@ -237,6 +238,11 @@ class World(object):
     def assign_landmark_colors(self):
         for landmark in self.landmarks:
             landmark.color = np.array([0.25, 0.25, 0.25])
+        for landmark in self.landmarks:
+            landmark.color_list = [np.array([1, 1, 1]),
+                                   np.array([0., 0., 0.]),
+                                   np.array([0., 0., 0.]),
+                                   np.array([0., 0., 0.])]
 
     # update state of the world
     def step(self):

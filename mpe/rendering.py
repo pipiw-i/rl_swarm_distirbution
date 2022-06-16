@@ -2,9 +2,11 @@
 2D rendering framework
 """
 from __future__ import division
+
 import os
-import six
 import sys
+
+import six
 
 if "Apple" in sys.version:
     if 'DYLD_FALLBACK_LIBRARY_PATH' in os.environ:
@@ -294,6 +296,40 @@ def make_circle(radius=10, res=30, filled=True):
         return PolyLine(points, True)
 
 
+def make_triangle(radius=10, res=10, filled=True):
+    points = []
+    ratio_60 = 2 * radius * math.sqrt(3) / 2
+    ratio_30 = 2 * radius / 2
+    # 三角形的三条边
+    for i in range(res):
+        points.append((0 - ratio_60 * i / res, 2 * radius - 3 * ratio_30 * i / res))
+    for i in range(res):
+        points.append((- ratio_60 + 2 * ratio_60 * i / res, - ratio_30))
+    for i in range(res):
+        points.append((0 + ratio_60 * i / res, 2 * radius - 3 * ratio_30 * i / res))
+    if filled:  # 填充整个圆
+        return FilledPolygon(points)
+    else:
+        return PolyLine(points, True)
+
+
+def make_square(radius=10, res=10, filled=True):
+    points = []
+    # 正角形的4条边
+    for i in range(res):
+        points.append((- 2 * radius, 2 * radius - 4 * radius * i / res))
+    for i in range(res):
+        points.append((- 2 * radius + 4 * radius * i / res, - 2 * radius))
+    for i in range(res):
+        points.append((2 * radius, - 2 * radius + 4 * radius * i / res))
+    for i in range(res):
+        points.append((2 * radius - 4 * radius * i / res, 2 * radius))
+    if filled:  # 填充整个圆
+        return FilledPolygon(points)
+    else:
+        return PolyLine(points, True)
+
+
 def make_polygon(v, filled=True):
     if filled:
         return FilledPolygon(v)
@@ -306,12 +342,14 @@ def make_polyline(v, width=1):
 
 
 def make_capsule(length, width):
-    l, r, t, b = 0, length, width / 2, -width / 2
+    l, r, t, b = -1.5 * length, 1.5 * length, width / 2, -width / 2
     box = make_polygon([(l, b), (l, t), (r, t), (r, b)])
     circ0 = make_circle(width / 2)
     circ1 = make_circle(width / 2)
+    circ2 = make_circle(width / 2)
     circ1.add_attr(Transform(translation=(length, 0)))
-    geom = Compound([box, circ0, circ1])
+    circ0.add_attr(Transform(translation=(-length, 0)))
+    geom = Compound([box, circ0, circ1, circ2])
     return geom
 
 
@@ -320,7 +358,7 @@ class Compound(Geom):
         Geom.__init__(self)
         self.gs = gs
         for g in self.gs:
-            g.attrs = [a for a in g.attrs if not isinstance(a, Color)]
+            g.attrs = [a for a in g.attrs]
 
     def render1(self):
         for g in self.gs:
