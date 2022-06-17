@@ -61,7 +61,7 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
-            landmark.movable = False
+            landmark.movable = True
         # make initial conditions
         self.reset_world(world)
         return world
@@ -88,6 +88,9 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.is_decided = False
             agent.now_goal = None
+            agent.now_goal_feature = None
+            agent.landmark_feature.clear()
+            agent.attack_goal_pos = None
             if len(self.other_agent_pos) == 0:
                 agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
                 agent.state.p_vel = np.zeros(world.dim_p)
@@ -109,6 +112,7 @@ class Scenario(BaseScenario):
             landmark.state.p_pos = np.random.uniform(- 0.5 * cam_range, + 0.5 * cam_range, world.dim_p)
             # landmark.state.p_pos = np.array([0.01, 0.01])
             landmark.state.p_vel = np.array([0, 0])
+            landmark.feature = i
 
     def set_agent_landmark_numbers(self, agent_numbers, landmark_numbers):
         self.num_agents = agent_numbers
@@ -177,6 +181,49 @@ class Scenario(BaseScenario):
         r_obs_landmarks = copy.deepcopy(obs_landmarks)
         return r_obs_landmarks
 
+    def get_landmark_from_feature(self, agent, world):
+        obs_landmarks = []
+        for ag in world.agents:
+            if ag == agent:
+                for ag_landmark_feature in ag.landmark_feature:
+                    if_exist = False
+                    for obs_landmark in obs_landmarks:
+                        if ag_landmark_feature == obs_landmark:
+                            if_exist = True
+                    if not if_exist:
+                        for new_ag_landmark_feature in ag.landmark_feature:
+                            obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
+            # 可以联系上的智能体,这里是能够直接联系的智能体，不考虑间接联系
+            elif int(ag.name[-1]) in agent.com_agent_index:
+                for ag_landmark_feature in ag.landmark_feature:
+                    if_exist = False
+                    for obs_landmark in obs_landmarks:
+                        if ag_landmark_feature == obs_landmark:
+                            if_exist = True
+                    if not if_exist:
+                        for new_ag_landmark_feature in ag.landmark_feature:
+                            obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
+        if obs_landmarks:  # obs_landmarks 所有智能体能够检测到的目标
+            for obs_landmark in obs_landmarks:
+                is_exist = False
+                for landmark_get in self.landmark_get:
+                    if obs_landmark == landmark_get:
+                        is_exist = True
+                        continue
+                if not is_exist:
+                    self.landmark_get.append(copy.deepcopy(obs_landmark))
+        if self.landmark_get:
+            for a in world.agents:
+                a.history_landmark_position = self.landmark_get
+        # print(f"self.landmark_get is {self.landmark_get}")
+        obs_landmarks.sort()
+        r_obs_landmarks = copy.deepcopy(obs_landmarks)
+        r_obs_landmarks_pos = []
+        for landmark in world.landmarks:
+            if landmark.feature in r_obs_landmarks:
+                r_obs_landmarks_pos.append(copy.deepcopy(landmark.state.p_pos))
+        return r_obs_landmarks_pos, r_obs_landmarks
+
     def reward(self, agent, world):
         rew = 0
         attack_agent_number = 0
@@ -205,14 +252,22 @@ class Scenario(BaseScenario):
         # 该函数用来 ③ 更新能够联系上的智能体个数
         #           ④ 更新当前所有的无人机能够探测的目标位置(仅自己的范围)
         # print("更新智能体状态，探测目标以及联系智能体编号")
+        for landmark in world.landmarks:
+            # landmark.state.p_vel = np.random.uniform(- 0.1, + 0.1, world.dim_p)
+            landmark.state.p_vel = np.array([-0.02, -0.02])
         for agent in world.agents:
             agent.com_agent_index.clear()
             agent.benchmark_position.clear()
-            dists = [[np.sqrt(np.sum(np.square(agent.state.p_pos - l.state.p_pos))), l.state.p_pos, l.been_attacked]
+            agent.landmark_feature.clear()
+            dists = [[np.sqrt(np.sum(np.square(agent.state.p_pos - l.state.p_pos))),
+                      l.state.p_pos,
+                      l.been_attacked,
+                      l.feature]
                      for l in world.landmarks]
-            for dist, pos, been_attacked in dists:
+            for dist, pos, been_attacked,l_feature in dists:
                 if dist < agent.search_size and not been_attacked:
                     agent.benchmark_position.append(pos)
+                    agent.landmark_feature.append(l_feature)
 
             # 得到与其他智能体的距离，看是否能够通讯
             com_dists = [[np.sqrt(np.sum(np.square(agent.state.p_pos - a.state.p_pos))), a.is_destroyed]
@@ -280,17 +335,20 @@ class Scenario(BaseScenario):
             agent.is_decided = False
             agent.now_goal = None
         if not agent.is_decided:
-            obs_landmarks = self.get_landmark(agent, world)
+            # obs_landmarks = self.get_landmark(agent, world)
+            obs_landmarks, obs_landmarks_feature = self.get_landmark_from_feature(agent, world)
             if len(obs_landmarks) > 2:
-                # print("len(obs_landmarks) is 2 !!!")
-                np.sort(obs_landmarks)  # 采用相同的算法，使得每个智能体观测到的多个目标能够顺序一致
+                # np.sort(obs_landmarks)  # 采用相同的算法，使得每个智能体观测到的多个目标能够顺序一致
                 agent.now_goal = [copy.deepcopy(obs_landmarks[0])]
+                agent.now_goal_feature = [copy.deepcopy(obs_landmarks_feature[0])]
                 obs_landmarks = copy.deepcopy(agent.now_goal)
+                obs_landmarks_feature = copy.deepcopy(agent.now_goal_feature)
             else:
                 agent.now_goal = obs_landmarks
+                agent.now_goal_feature = obs_landmarks_feature
         else:
             obs_landmarks = agent.now_goal
-
+            obs_landmarks_feature = agent.now_goal_feature
         # print(f"obs_landmarks is {obs_landmarks}")
         all_pos = []
         all_relative_position = []
@@ -335,6 +393,9 @@ class Scenario(BaseScenario):
                    f"当前智能体能够检测到的目标列表(位置):{obs_landmarks}\n"
         if self.need_log:
             self.logger.add_logs(str_logs)
-
+        for landmark in world.landmarks:
+            if landmark.feature == agent.attack_goal:
+                agent.attack_goal_pos = landmark.state.p_pos
         return [agent, attack_number, agent.com_agent_index, all_pos,
-                all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks]
+                all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks,
+                obs_landmarks_feature]

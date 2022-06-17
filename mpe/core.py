@@ -95,6 +95,8 @@ class Landmark(Entity):
         self.been_attacked = False
         # 三种颜色
         self.color_list = None
+        # 属于目标的特点，该特点可以区分其他不同的目标
+        self.feature = None
 
 
 # properties of agent entities
@@ -133,9 +135,12 @@ class Agent(Entity):
         self.index_number = 0  # 无人机编号
         self.is_destroyed = False  # 如果这个值为True，那么说明这个无人机已经执行了攻击任务，该无人机已经被摧毁，将其移除交流范围
         self.attack_goal = None  # 攻击目标，与上面的is_destroyed对应
+        self.attack_goal_pos = None  # 攻击目标，与上面的is_destroyed对应
         self.is_decided = False  # 表明当前智能体正在执行决策过程
         self.now_goal = None
         self.history_landmark_position = []  # 找到的目标物编号，以位置来区分
+        self.landmark_feature = []
+        self.now_goal_feature = None
 
 
 # multi-agent world

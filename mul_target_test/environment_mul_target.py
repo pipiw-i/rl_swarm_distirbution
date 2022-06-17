@@ -133,7 +133,7 @@ class MultiAgentEnv(gym.Env):
                 attack_landmark = list(landmark_agent.keys())[0]
                 attack_this_landmark_agent_index = []
                 attack_landmark = np.array(attack_landmark)
-                if (abs(world_landmark.state.p_pos - attack_landmark) < 1e-3).all():
+                if world_landmark.feature == attack_landmark:
                     attack_agent_number += len(list(landmark_agent.values())[0])
                     for agent_index in list(landmark_agent.values())[0]:
                         attack_this_landmark_agent_index.append(agent_index)
@@ -159,7 +159,9 @@ class MultiAgentEnv(gym.Env):
                     if world_agent.index_number in attack_this_landmark_agent_index:
                         world_agent.is_destroyed = True
                         # 更新该无人机击毁的目标位置
-                        world_agent.attack_goal = attack_landmark
+                        for landmark in all_landmarks:
+                            if landmark.feature == attack_landmark:
+                                world_agent.attack_goal = landmark.feature
                         world_agent.collide = False
                         world_agent.color = np.array([0.99, 0.25, 0.25])
         # 根据目标分配的情况，决定是否重分配
@@ -170,7 +172,7 @@ class MultiAgentEnv(gym.Env):
                 agent_d = list(landmark_agent.values())[0]
                 if len(agent_d) == 1:
                     for landmark in all_landmarks:
-                        if abs(landmark.state.p_pos - np.array(landmark_d)).all() < 1e-3:
+                        if landmark.feature == np.array(landmark_d):
                             landmark.been_attacked = False
 
         obs_n = []

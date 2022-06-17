@@ -85,7 +85,7 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
+        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
         one_agent_boids_policy = self.boids_policy
         now_agent_pos = agent.state.p_pos
         now_agent_vel = agent.state.p_vel
@@ -100,11 +100,12 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
+            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
+            obs_landmarks_feature = obs
         if agent.is_destroyed:
-            target = agent.attack_goal
+            target = agent.attack_goal_pos
             now_pos = agent.state.p_pos
-            act = 0.1 * (target - now_pos)
+            act = 0.5 * (target - now_pos)
             action = np.array([0, act[0], 0, act[1], 0])
         elif len(obs_landmarks) == 0:
             one_agent_boids_policy = self.boids_policy
@@ -124,7 +125,7 @@ class AgentPolicy:
                     entity_pos.append(obs_landmark - agent.state.p_pos)
                     new_obs = np.concatenate(
                         [np.array([attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
-                    action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmark, agent.index_number]
+                    action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmarks_feature, agent.index_number]
                     break
             else:
                 for obs_landmark in obs_landmarks:
@@ -148,7 +149,8 @@ class AgentPolicy:
                             entity_pos.append(obs_landmark - agent.state.p_pos)
                             new_obs = np.concatenate(
                                 [np.array([attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
-                            action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmark, agent.index_number]
+                            action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmarks_feature,
+                                      agent.index_number]
                             break
                     # 因为通讯距离问题，会有的无人机无法统计到所有的攻击无人机
                     elif attack_number < 4:
@@ -167,6 +169,7 @@ def policy_run(env, number_agent, load_file, need_render):
     agent_policy = AgentPolicy(agent_number=number_agent, load_file=load_file).init_policy()
     obs_n = env.mpe_env.reset()
     landmark_attack_agent_index_dic_list = []
+    landmark_been_attacked_list = []
     reassign_goals = False
     gaols_finish = False
     agent_finish = False
@@ -187,8 +190,8 @@ def policy_run(env, number_agent, load_file, need_render):
             # 说明该部分是由rl产生的
             if len(action) == 3:
                 rl_agent_number += 1
-                rl_act, landmark, agent_index_number = action
-                landmark_pos = (landmark[0], landmark[1])  # 使用元组，才可以使用字典
+                rl_act, obs_landmarks_feature, agent_index_number = action
+                landmark_pos = (obs_landmarks_feature[0])  # 使用元组，才可以使用字典
                 if rl_act[0] > 0.5:
                     if landmark_attack_agent_index_dic.get(landmark_pos, 0) == 0:
                         landmark_attack_agent_index_dic[landmark_pos] = [agent_index_number]
@@ -206,18 +209,36 @@ def policy_run(env, number_agent, load_file, need_render):
             attack_this_landmark_agent_index = landmark_attack_agent_index_dic.get(attack_landmark)
             attack_this_landmark_agent_number = len(attack_this_landmark_agent_index)
             if 0 < attack_this_landmark_agent_number <= 3:
-                landmark_attack_agent_index_dic_list.append(landmark_attack_agent_index_dic)
+                if attack_landmark in landmark_been_attacked_list:
+                    # 重分配出现的问题
+                    if reassign_goals:
+                        for ind, landmark_item in enumerate(landmark_been_attacked_list):
+                            if attack_landmark == landmark_item:
+                                if 0 < len(attack_this_landmark_agent_index) <= 2:
+                                    # 限制为1-2
+                                    for a_i in attack_this_landmark_agent_index:
+                                        # 防止重复
+                                        if a_i in landmark_attack_agent_index_dic_list[ind][attack_landmark]:
+                                            continue
+                                        else:
+                                            landmark_attack_agent_index_dic_list[ind][attack_landmark].append(a_i)
+                                else:
+                                    continue
+                    continue
+                else:
+                    landmark_been_attacked_list.append(attack_landmark)
+                    landmark_attack_agent_index_dic_list.append({attack_landmark: attack_this_landmark_agent_index})
         obs_n = new_obs_n
         if len(landmark_attack_agent_index_dic_list) == number_gaols:
             gaols_finish = True
         destroyed_number_count = 0
-        for a, _, _, _, _, _, _, _, _ in new_obs_n:
+        for a, _, _, _, _, _, _, _, _, _ in new_obs_n:
             if a.is_destroyed:
                 destroyed_number_count += 1
         if destroyed_number_count == number_agent:
             agent_finish = True
         if agent_finish:
-            pass
+            break
         elif gaols_finish and not agent_finish:
             reassign_goals = True
 
@@ -233,31 +254,32 @@ if __name__ == '__main__':
 
     distributions_logger = Logs(logger_name='distributions_logs', log_file_name='distributions_logs_6_6_17')
     result_logger = Logs(logger_name='result_logs', log_file_name='result_logs_6_6_17')
-    for i in range(2, 3):
+    for i in range(7):
         all_distributions = {}
-        number_UAVs = 8 + 2 * i
-        number_gaols = 4 + 1 * i
+        number_UAVs = 8 + 4 * i
+        number_gaols = 4 + 2 * i
         all_number_agent_attack_mean = []
         r_env, r_number_agent, r_load_file, r_need_render = run_mpe(
             load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_17',
             run_file='simple_mul_target.py', number_agent=number_UAVs,
             number_landmark=number_gaols,
-            need_render=True)
+            need_render=False)
         print(f"环境初始化成功,number_UAVs:{number_UAVs},number_gaols:{number_gaols}")
-        for j in range(1):
+        for j in range(50):
             distributions = policy_run(r_env, r_number_agent, r_load_file, r_need_render)
             all_goal_distributions = {}
             for distribution in distributions:
                 for key_index, key_item in enumerate(list(distribution.keys())):
-                    if len(distribution.get(key_item)) > 3:
-                        continue
+                    if all_goal_distributions.get(key_item, 0) == 0:
+                        all_goal_distributions[key_item] = copy.deepcopy(distribution.get(key_item))
                     else:
-                        if all_goal_distributions.get(key_item, 0) == 0:
-                            all_goal_distributions[key_item] = distribution.get(key_item)
-                        else:
-                            for agent_index in distribution.get(key_item):
+                        for agent_index in distribution.get(key_item):
+                            if agent_index in all_goal_distributions[key_item]:
+                                continue
+                            else:
                                 all_goal_distributions[key_item].append(agent_index)
             # 统计这个轮次的平均值以及每个回合的分布情况
+            # print(distributions)
             str_logs = f"当前轮数{j}_无人机数目{number_UAVs}_目标数目{number_gaols}\n"
             number_agent_attack_mean = 0
             for key, values in all_goal_distributions.items():
