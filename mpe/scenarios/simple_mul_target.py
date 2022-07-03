@@ -32,8 +32,9 @@ class Scenario(BaseScenario):
         self.search_size = search_size
         self.com_size = com_size
         self.logger = Logs('comm_logger', 'mul_target')
-        # 每个机器人的路径轨迹
+        # 其他位置信息
         self.other_agent_pos = []
+        self.other_landmark_pos = []
         # 历史中曾经探测到的目标位置
         self.landmark_get = []
         self.attack_number = 0
@@ -69,6 +70,7 @@ class Scenario(BaseScenario):
     def reset_world(self, world):
         # random properties for agents
         self.other_agent_pos = []
+        self.other_landmark_pos = []
         self.move = False
         self.attack_number = 0
         self.landmark_get.clear()  # 存储的历史位置清零
@@ -92,15 +94,15 @@ class Scenario(BaseScenario):
             agent.landmark_feature.clear()
             agent.attack_goal_pos = None
             if len(self.other_agent_pos) == 0:
-                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
+                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
                 agent.state.p_vel = np.zeros(world.dim_p)
                 agent.state.c = np.zeros(world.dim_c)
             else:
-                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
+                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
                 dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - pos)))
                          for pos in self.other_agent_pos]
                 while min(dists) < 0.1 * agent.search_size or max(dists) > agent.com_size:
-                    agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
+                    agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
                     dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - pos)))
                              for pos in self.other_agent_pos]
                 agent.state.p_vel = np.zeros(world.dim_p)
@@ -109,10 +111,20 @@ class Scenario(BaseScenario):
             self.other_agent_pos.append(copy.deepcopy(agent.state.p_pos))
         for i, landmark in enumerate(world.landmarks):
             landmark.been_attacked = False
-            landmark.state.p_pos = np.random.uniform(- 0.5 * cam_range, + 0.5 * cam_range, world.dim_p)
+            if len(self.other_landmark_pos) == 0:
+                landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+            else:
+                landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+                dists = [np.sqrt(np.sum(np.square(landmark.state.p_pos - pos)))
+                         for pos in self.other_landmark_pos]
+                while min(dists) < 0.4:
+                    landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+                    dists = [np.sqrt(np.sum(np.square(landmark.state.p_pos - pos)))
+                             for pos in self.other_landmark_pos]
             # landmark.state.p_pos = np.array([0.01, 0.01])
             landmark.state.p_vel = np.array([0, 0])
             landmark.feature = i
+            self.other_landmark_pos.append(copy.deepcopy(landmark.state.p_pos))
 
     def set_agent_landmark_numbers(self, agent_numbers, landmark_numbers):
         self.num_agents = agent_numbers
@@ -253,8 +265,8 @@ class Scenario(BaseScenario):
         #           ④ 更新当前所有的无人机能够探测的目标位置(仅自己的范围)
         # print("更新智能体状态，探测目标以及联系智能体编号")
         for landmark in world.landmarks:
-            # landmark.state.p_vel = np.random.uniform(- 0.1, + 0.1, world.dim_p)
-            landmark.state.p_vel = np.array([-0.02, -0.02])
+            # landmark.state.p_vel = np.random.uniform(-0.1, +0.1, world.dim_p)
+            landmark.state.p_vel = np.array([-0.01, -0.01])
         for agent in world.agents:
             agent.com_agent_index.clear()
             agent.benchmark_position.clear()
@@ -264,7 +276,7 @@ class Scenario(BaseScenario):
                       l.been_attacked,
                       l.feature]
                      for l in world.landmarks]
-            for dist, pos, been_attacked,l_feature in dists:
+            for dist, pos, been_attacked, l_feature in dists:
                 if dist < agent.search_size and not been_attacked:
                     agent.benchmark_position.append(pos)
                     agent.landmark_feature.append(l_feature)

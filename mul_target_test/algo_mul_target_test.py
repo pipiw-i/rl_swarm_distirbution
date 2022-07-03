@@ -51,7 +51,7 @@ class AgentPolicy:
                  n_test_times=6000,
                  boids_rule_1_distance=4.0,
                  boids_rule_2_distance=4.0,
-                 boids_rule_3_distance=1.5
+                 boids_rule_3_distance=2.5
                  ):
         self.agent_number = agent_number
         self.load_file = load_file
@@ -125,7 +125,16 @@ class AgentPolicy:
                     entity_pos.append(obs_landmark - agent.state.p_pos)
                     new_obs = np.concatenate(
                         [np.array([attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
-                    action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmarks_feature, agent.index_number]
+                    one_agent_boids_policy = self.boids_policy
+                    now_agent_pos = agent.state.p_pos
+                    now_agent_vel = agent.state.p_vel
+                    action_boids = one_agent_boids_policy.one_agent_apply_boids_rules(now_agent_pos, all_pos,
+                                                                                      need_dist,
+                                                                                      now_agent_vel, all_vel,
+                                                                                      time_step)
+                    action = [one_agent_rl_policy.get_rl_action(new_obs) + 2 * action_boids,
+                              obs_landmarks_feature,
+                              agent.index_number]
                     break
             else:
                 for obs_landmark in obs_landmarks:
@@ -142,6 +151,13 @@ class AgentPolicy:
                                                                                         time_step)
                             break
                         else:
+                            one_agent_boids_policy = self.boids_policy
+                            now_agent_pos = agent.state.p_pos
+                            now_agent_vel = agent.state.p_vel
+                            action_boids = one_agent_boids_policy.one_agent_apply_boids_rules(now_agent_pos, all_pos,
+                                                                                             need_dist,
+                                                                                             now_agent_vel, all_vel,
+                                                                                             time_step)
                             # 只对攻击的无人机继续采用rl策略
                             one_agent_rl_policy = self.rl_policy
                             entity_pos = []
@@ -149,7 +165,8 @@ class AgentPolicy:
                             entity_pos.append(obs_landmark - agent.state.p_pos)
                             new_obs = np.concatenate(
                                 [np.array([attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
-                            action = [one_agent_rl_policy.get_rl_action(new_obs), obs_landmarks_feature,
+                            action = [one_agent_rl_policy.get_rl_action(new_obs) + 2 * action_boids,
+                                      obs_landmarks_feature,
                                       agent.index_number]
                             break
                     # 因为通讯距离问题，会有的无人机无法统计到所有的攻击无人机
@@ -208,13 +225,15 @@ def policy_run(env, number_agent, load_file, need_render):
         for attack_landmark in attack_landmarks:
             attack_this_landmark_agent_index = landmark_attack_agent_index_dic.get(attack_landmark)
             attack_this_landmark_agent_number = len(attack_this_landmark_agent_index)
-            if 0 < attack_this_landmark_agent_number <= 3:
+
+            if 1 <= attack_this_landmark_agent_number <= 3:
                 if attack_landmark in landmark_been_attacked_list:
                     # 重分配出现的问题
                     if reassign_goals:
+                        # 记录重分配的次数，如果次数过多，那么就适当放宽条件
                         for ind, landmark_item in enumerate(landmark_been_attacked_list):
                             if attack_landmark == landmark_item:
-                                if 0 < len(attack_this_landmark_agent_index) <= 2:
+                                if 0 < len(attack_this_landmark_agent_index) <= 1:
                                     # 限制为1-2
                                     for a_i in attack_this_landmark_agent_index:
                                         # 防止重复
@@ -238,8 +257,9 @@ def policy_run(env, number_agent, load_file, need_render):
         if destroyed_number_count == number_agent:
             agent_finish = True
         if agent_finish:
-            break
+            pass
         elif gaols_finish and not agent_finish:
+            # print("现在进行重分配")
             reassign_goals = True
 
     return landmark_attack_agent_index_dic_list
@@ -254,18 +274,18 @@ if __name__ == '__main__':
 
     distributions_logger = Logs(logger_name='distributions_logs', log_file_name='distributions_logs_6_6_17')
     result_logger = Logs(logger_name='result_logs', log_file_name='result_logs_6_6_17')
-    for i in range(7):
+    for i in range(0, 4):
         all_distributions = {}
-        number_UAVs = 8 + 4 * i
-        number_gaols = 4 + 2 * i
+        number_UAVs = 8 + 8 * i
+        number_gaols = 4 + 4 * i
         all_number_agent_attack_mean = []
         r_env, r_number_agent, r_load_file, r_need_render = run_mpe(
             load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_17',
             run_file='simple_mul_target.py', number_agent=number_UAVs,
             number_landmark=number_gaols,
-            need_render=False)
+            need_render=True)
         print(f"环境初始化成功,number_UAVs:{number_UAVs},number_gaols:{number_gaols}")
-        for j in range(50):
+        for j in range(1):
             distributions = policy_run(r_env, r_number_agent, r_load_file, r_need_render)
             all_goal_distributions = {}
             for distribution in distributions:

@@ -108,7 +108,7 @@ class MultiAgentEnv(gym.Env):
         # rendering
         self.shared_viewer = shared_viewer
         if self.shared_viewer:
-            self.viewers = [None] * 3
+            self.viewers = [None]
         else:
             self.viewers = [None] * self.n
         self._reset_render()
@@ -147,14 +147,14 @@ class MultiAgentEnv(gym.Env):
 
                         if attack_agent_number == 2:
                             world_landmark.color_list = [np.array([1, 1, 1]),
-                                                         np.array([1, 1, 1]),
+                                                         np.array([0.75, 0.25, 0.25]),
                                                          np.array([1, 1, 1]),
                                                          np.array([0.75, 0.25, 0.25])]
                         if attack_agent_number == 3:
                             world_landmark.color_list = [np.array([1, 1, 1]),
-                                                         np.array([1, 1, 1]),
                                                          np.array([0.75, 0.25, 0.25]),
-                                                         np.array([1, 1, 1])]
+                                                         np.array([0.75, 0.25, 0.25]),
+                                                         np.array([0.75, 0.25, 0.25])]
                 for world_agent in self.agents:
                     if world_agent.index_number in attack_this_landmark_agent_index:
                         world_agent.is_destroyed = True
@@ -180,10 +180,10 @@ class MultiAgentEnv(gym.Env):
         new_action_n = []
         for action_index, action in enumerate(action_n):
             if action[0] < 0.5:
-                action = action
+                action = 0.8 * action
                 self.agents[action_index].attack = False
             else:
-                action = action
+                action = 0.8 * action
                 self.agents[action_index].attack = True
             new_action_n.append(copy.deepcopy(action))
         self._get_landmark_pos()
@@ -403,7 +403,7 @@ class MultiAgentEnv(gym.Env):
                             entity_comm_geoms.append(comm)
 
                 elif 'landmark' in entity.name:
-                    geom = rendering.make_capsule(2.5 * entity.size, 2.5 * entity.size)  # 画一个size大小的圆
+                    geom = rendering.make_capsule(4 * entity.size, 4 * entity.size)  # 画一个size大小的圆
                     xform = rendering.Transform()  # 建立一个位置的映射，使画在中心的圆能够映射到
                     geom.set_color(*entity.color)
                     if entity.channel is not None:
@@ -458,9 +458,20 @@ class MultiAgentEnv(gym.Env):
             pos_destroyed = np.zeros(self.world.dim_p)
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)
+                all_agent_pos = np.zeros(self.world.dim_p)
+                all_landmark_pos = np.zeros(self.world.dim_p)
                 number_not_destroyed = 0
                 number_destroyed = 0
+                landmark_number = 0
+                agent_number = 0
+                for viewer_landmark in self.world.landmarks:
+                    all_landmark_pos += viewer_landmark.state.p_pos
+                    landmark_number += 1
+                all_landmark_pos /= landmark_number
+
                 for viewer_agent in self.agents:
+                    all_agent_pos += viewer_agent.state.p_pos
+                    agent_number += 1
                     if viewer_agent.is_destroyed:
                         number_destroyed += 1
                         pos_destroyed = np.sum([pos_destroyed, viewer_agent.state.p_pos], axis=0)
@@ -468,6 +479,7 @@ class MultiAgentEnv(gym.Env):
                     else:
                         pos = np.sum([pos, viewer_agent.state.p_pos], axis=0)
                         number_not_destroyed += 1
+                all_agent_pos /= agent_number
                 if number_not_destroyed != 0:
                     pos /= number_not_destroyed
                 else:
@@ -479,17 +491,15 @@ class MultiAgentEnv(gym.Env):
 
             else:
                 pos = self.agents[i].state.p_pos
-            # 设置可视化范围，为0，0为中心2*cam_range为长的矩形
+                all_agent_pos = np.zeros(self.world.dim_p)
+                all_landmark_pos = np.zeros(self.world.dim_p)
+            mid_pos = (all_agent_pos + all_landmark_pos)/2
+            mid_pos_range = np.sqrt(np.sum(np.square(all_agent_pos - all_landmark_pos)))
             if i == 0:
-                self.viewers[i].set_bounds(0 - 5 * cam_range, 0 + 1 * cam_range, 0 - 5 * cam_range,
-                                           0 + 1 * cam_range)
-            elif i == 1:
-                self.viewers[i].set_bounds(pos[0] - cam_range, pos[0] + cam_range, pos[1] - cam_range,
-                                           pos[1] + cam_range)
-            else:
-                self.viewers[i].set_bounds(pos_destroyed[0] - cam_range, pos_destroyed[0] + cam_range,
-                                           pos_destroyed[1] - cam_range,
-                                           pos_destroyed[1] + cam_range)
+                self.viewers[i].set_bounds(mid_pos[0] - max(0.5 * mid_pos_range, 1.5 * cam_range),
+                                           mid_pos[0] + max(0.5 * mid_pos_range, 1.5 * cam_range),
+                                           mid_pos[1] - max(0.5 * mid_pos_range, 1.5 * cam_range),
+                                           mid_pos[1] + max(0.5 * mid_pos_range, 1.5 * cam_range))
             # update geometry positions
             agent_number = 0
             for e, entity in enumerate(self.world.entities):
