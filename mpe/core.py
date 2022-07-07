@@ -235,19 +235,28 @@ class World(object):
         for color, agent in zip(colors, self.agents):
             agent.color = color
 
-    def assign_boids_agent_colors(self):
-        for boids_agent in self.boids_agents:
-            boids_agent.color = np.array([0.25, 0.25, 0.25])
+    def assign_rl_agent_colors(self, grouping_ratio):
+        for agent in self.agents:
+            if agent.index_number < int(grouping_ratio * self.num_agents):
+                agent.color = np.array([0.25, 0.25, 0.25])
+            else:
+                agent.color = np.array([0., 1., 1.])
 
     # landmark color
-    def assign_landmark_colors(self):
+    def assign_landmark_colors(self, grouping_ratio):
         for landmark in self.landmarks:
             landmark.color = np.array([0.25, 0.25, 0.25])
         for landmark in self.landmarks:
-            landmark.color_list = [np.array([1, 1, 1]),
-                                   np.array([0., 0., 0.]),
-                                   np.array([0., 0., 0.]),
-                                   np.array([0., 0., 0.])]
+            if landmark.feature < int(grouping_ratio * self.num_landmarks):
+                landmark.color_list = [np.array([1, 1, 1]),
+                                       np.array([0., 0., 0.]),
+                                       np.array([0., 0., 0.]),
+                                       np.array([0., 0., 0.])]
+            else:
+                landmark.color_list = [np.array([1, 1, 1]),
+                                       np.array([0., 1., 1.]),
+                                       np.array([0., 1., 1.]),
+                                       np.array([0., 1., 1.])]
 
     # update state of the world
     def step(self):

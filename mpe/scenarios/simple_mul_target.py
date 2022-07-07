@@ -39,6 +39,7 @@ class Scenario(BaseScenario):
         self.landmark_get = []
         self.attack_number = 0
         self.move = False  # 移动执行攻击的无人机
+        self.grouping_ratio = 0
 
     def make_world(self):
         world = World()
@@ -74,8 +75,7 @@ class Scenario(BaseScenario):
         self.move = False
         self.attack_number = 0
         self.landmark_get.clear()  # 存储的历史位置清零
-        world.assign_agent_colors()
-        world.assign_landmark_colors()
+
         # set random initial states  随机初始状态
         for agent_index, agent in enumerate(world.agents):
             # 防止初始的随机地点会重叠到一起
@@ -94,15 +94,15 @@ class Scenario(BaseScenario):
             agent.landmark_feature.clear()
             agent.attack_goal_pos = None
             if len(self.other_agent_pos) == 0:
-                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
+                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
                 agent.state.p_vel = np.zeros(world.dim_p)
                 agent.state.c = np.zeros(world.dim_c)
             else:
-                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
+                agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
                 dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - pos)))
                          for pos in self.other_agent_pos]
                 while min(dists) < 0.1 * agent.search_size or max(dists) > agent.com_size:
-                    agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 1 * cam_range, world.dim_p)
+                    agent.state.p_pos = np.random.uniform(- 4 * cam_range, - 2 * cam_range, world.dim_p)
                     dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - pos)))
                              for pos in self.other_agent_pos]
                 agent.state.p_vel = np.zeros(world.dim_p)
@@ -112,23 +112,26 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(world.landmarks):
             landmark.been_attacked = False
             if len(self.other_landmark_pos) == 0:
-                landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+                landmark.state.p_pos = np.random.uniform(- 0.5 * cam_range, + 0.5 * cam_range, world.dim_p)
             else:
-                landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+                landmark.state.p_pos = np.random.uniform(- 0.5 * cam_range, + 0.5 * cam_range, world.dim_p)
                 dists = [np.sqrt(np.sum(np.square(landmark.state.p_pos - pos)))
                          for pos in self.other_landmark_pos]
-                while min(dists) < 0.4:
-                    landmark.state.p_pos = np.random.uniform(- 0.8 * cam_range, + 0.8 * cam_range, world.dim_p)
+                while min(dists) < 0.5:
+                    landmark.state.p_pos = np.random.uniform(- 0.5 * cam_range, + 0.5 * cam_range, world.dim_p)
                     dists = [np.sqrt(np.sum(np.square(landmark.state.p_pos - pos)))
                              for pos in self.other_landmark_pos]
             # landmark.state.p_pos = np.array([0.01, 0.01])
             landmark.state.p_vel = np.array([0, 0])
             landmark.feature = i
             self.other_landmark_pos.append(copy.deepcopy(landmark.state.p_pos))
+        world.assign_rl_agent_colors(self.grouping_ratio)
+        world.assign_landmark_colors(self.grouping_ratio)
 
-    def set_agent_landmark_numbers(self, agent_numbers, landmark_numbers):
+    def set_agent_landmark_numbers(self, agent_numbers, landmark_numbers, grouping_ratio):
         self.num_agents = agent_numbers
         self.num_landmarks = landmark_numbers
+        self.grouping_ratio = grouping_ratio
 
     def benchmark_data(self, agent, world):
         rew = 0
@@ -373,19 +376,29 @@ class Scenario(BaseScenario):
         for dist, w_agent in dists:
             if w_agent.is_destroyed:
                 continue
+            # dist == 0 只有其本身
             if w_agent.attack and dist == 0:
                 attack_number += 1
                 all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
             elif not w_agent.attack and dist == 0:
                 all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
+            # 判断其他的可联系智能体
             elif dist < agent.com_size and dist != 0:
                 all_pos.append(copy.deepcopy(w_agent.state.p_pos))
                 all_relative_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
+                # 区分目标,统计相同目标的rl观测参数，包括攻击数目，攻击无人机的位置，以及自身的位置，目标位置(这里是全部的)
+                if agent.index_number >= int(self.grouping_ratio * self.num_agents):
+                    if w_agent.index_number >= self.num_agents // 2:
+                        if w_agent.attack:
+                            attack_number += 1
+                            all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
+                else:
+                    if w_agent.index_number < int(self.grouping_ratio * self.num_agents):
+                        if w_agent.attack:
+                            attack_number += 1
+                            all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
                 all_vel.append(copy.deepcopy(w_agent.state.p_vel))
                 need_dist.append(copy.deepcopy(dist))
-                if w_agent.attack:
-                    attack_number += 1
-                    all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
 
         if len(obs_landmarks) == 0:
             # 不能直接检测到目标，不统计周围的攻击数目

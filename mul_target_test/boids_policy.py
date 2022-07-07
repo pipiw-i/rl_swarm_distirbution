@@ -53,7 +53,7 @@ class boids_policy:
         y_mean /= (number_rule1_agent + 1)
         now_agent_acc_x = x_mean - now_agent_pos[0]
         now_agent_acc_y = y_mean - now_agent_pos[1]
-        rule1_acc.append(np.array([now_agent_acc_x, now_agent_acc_y]))
+        rule1_acc.append(0.5 * np.array([now_agent_acc_x, now_agent_acc_y]))
 
         rule2_acc = []
         now_agent_dist = all_agent_dists[0]
@@ -90,7 +90,7 @@ class boids_policy:
         else:
             now_agent_acc_x = 1. / x_dist_mean
             now_agent_acc_y = 1. / y_dist_mean
-        rule3_acc.append(np.array([now_agent_acc_x, now_agent_acc_y]))
+        rule3_acc.append(2 * np.array([now_agent_acc_x, now_agent_acc_y]))
 
         rule_acc = np.sum([rule1_acc, rule2_acc, rule3_acc], axis=0)
         rule_acc = self.apply_max_acc(rule_acc)
@@ -101,9 +101,11 @@ class boids_policy:
             points = []
             for i in range(125):
                 ang = 2 * math.pi * i / 125
-                points.append((math.cos(ang) * 3, math.sin(ang) * 3))
-            Hover_action = np.array([0, np.clip(points[time_step % 125][0] - now_agent_pos[0], -0.3, 0.3),
-                                     0, np.clip(points[time_step % 125][1] - now_agent_pos[1], -0.3, 0.3), 0])
+                points.append((math.cos(ang) * 2, math.sin(ang) * 2))
+            hover_x = 0.5 * np.clip(points[time_step % 125][0] - now_agent_pos[0], -1.0, 1.0)
+            hover_y = 0.5 * np.clip(points[time_step % 125][1] - now_agent_pos[1], -1.0, 1.0)
+            Hover_action = np.array([0, hover_x,
+                                     0, hover_y, 0])
         else:
             Hover_action = np.array([0, 0, 0, 0, 0])
         for rule_acc_one_agent in rule_acc:
@@ -249,5 +251,5 @@ class boids_policy:
                 new_acc.append(rule_agent_acc)
             else:
                 ratio = 1 / max_acc
-                new_acc.append(ratio * rule_agent_acc * 0.3)
+                new_acc.append(ratio * rule_agent_acc * 0.333333)
         return new_acc

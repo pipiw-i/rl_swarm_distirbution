@@ -121,8 +121,8 @@ class MultiAgentEnv(gym.Env):
 
     # step  this is  env.step()
     def step(self, action_n_landmark_attack_agent_index_dic):
-        action_n, landmark_attack_agent_index_dic, reassign_goals, landmark_attack_agent_index_dic_list\
-            = action_n_landmark_attack_agent_index_dic
+        action_n, landmark_attack_agent_index_dic, reassign_goals, \
+            landmark_attack_agent_index_dic_list,grouping_ratio = action_n_landmark_attack_agent_index_dic
         attack_landmarks = list(landmark_attack_agent_index_dic.keys())
         all_landmarks = self.world.landmarks
         self.agents = self.world.policy_agents
@@ -140,21 +140,41 @@ class MultiAgentEnv(gym.Env):
                     if 0 < attack_agent_number <= 3:
                         world_landmark.been_attacked = True
                         if attack_agent_number == 1:
-                            world_landmark.color_list = [np.array([1, 1, 1]),
-                                                         np.array([0.75, 0.25, 0.25]),
-                                                         np.array([1, 1, 1]),
-                                                         np.array([1, 1, 1])]
+                            if world_landmark.feature < int(grouping_ratio * len(all_landmarks)):
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0.25, 0.25]),
+                                                             np.array([1, 1, 1]),
+                                                             np.array([1, 1, 1])]
+                            else:
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0., 0.75]),
+                                                             np.array([1, 1, 1]),
+                                                             np.array([1, 1, 1])]
 
                         if attack_agent_number == 2:
-                            world_landmark.color_list = [np.array([1, 1, 1]),
-                                                         np.array([0.75, 0.25, 0.25]),
-                                                         np.array([1, 1, 1]),
-                                                         np.array([0.75, 0.25, 0.25])]
+                            if world_landmark.feature < int(grouping_ratio * len(all_landmarks)):
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0.25, 0.25]),
+                                                             np.array([1, 1, 1]),
+                                                             np.array([0.75, 0.25, 0.25])]
+                            else:
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0., 0.75]),
+                                                             np.array([1, 1, 1]),
+                                                             np.array([0.75, 0., 0.75])]
+
                         if attack_agent_number == 3:
-                            world_landmark.color_list = [np.array([1, 1, 1]),
-                                                         np.array([0.75, 0.25, 0.25]),
-                                                         np.array([0.75, 0.25, 0.25]),
-                                                         np.array([0.75, 0.25, 0.25])]
+                            if world_landmark.feature < int(grouping_ratio * len(all_landmarks)):
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0.25, 0.25]),
+                                                             np.array([0.75, 0.25, 0.25]),
+                                                             np.array([0.75, 0.25, 0.25])]
+                            else:
+                                world_landmark.color_list = [np.array([1, 1, 1]),
+                                                             np.array([0.75, 0., 0.75]),
+                                                             np.array([0.75, 0., 0.75]),
+                                                             np.array([0.75, 0., 0.75])]
+
                 for world_agent in self.agents:
                     if world_agent.index_number in attack_this_landmark_agent_index:
                         world_agent.is_destroyed = True
@@ -163,7 +183,10 @@ class MultiAgentEnv(gym.Env):
                             if landmark.feature == attack_landmark:
                                 world_agent.attack_goal = landmark.feature
                         world_agent.collide = False
-                        world_agent.color = np.array([0.99, 0.25, 0.25])
+                        if world_agent.index_number < int(grouping_ratio * len(self.agents)):
+                            world_agent.color = np.array([0.99, 0.25, 0.25])
+                        else:
+                            world_agent.color = np.array([0.99, 0.99, 0.25])
         # 根据目标分配的情况，决定是否重分配
         if reassign_goals:
             # 对于已分配的所有目标来说
@@ -455,42 +478,20 @@ class MultiAgentEnv(gym.Env):
 
         results = []
         for i in range(len(self.viewers)):
-            pos_destroyed = np.zeros(self.world.dim_p)
             if self.shared_viewer:
-                pos = np.zeros(self.world.dim_p)
                 all_agent_pos = np.zeros(self.world.dim_p)
                 all_landmark_pos = np.zeros(self.world.dim_p)
-                number_not_destroyed = 0
-                number_destroyed = 0
                 landmark_number = 0
                 agent_number = 0
                 for viewer_landmark in self.world.landmarks:
                     all_landmark_pos += viewer_landmark.state.p_pos
                     landmark_number += 1
                 all_landmark_pos /= landmark_number
-
                 for viewer_agent in self.agents:
                     all_agent_pos += viewer_agent.state.p_pos
                     agent_number += 1
-                    if viewer_agent.is_destroyed:
-                        number_destroyed += 1
-                        pos_destroyed = np.sum([pos_destroyed, viewer_agent.state.p_pos], axis=0)
-                        continue
-                    else:
-                        pos = np.sum([pos, viewer_agent.state.p_pos], axis=0)
-                        number_not_destroyed += 1
                 all_agent_pos /= agent_number
-                if number_not_destroyed != 0:
-                    pos /= number_not_destroyed
-                else:
-                    pos = np.zeros(self.world.dim_p)
-                if number_destroyed != 0:
-                    pos_destroyed /= number_destroyed
-                else:
-                    pos_destroyed = np.zeros(self.world.dim_p)
-
             else:
-                pos = self.agents[i].state.p_pos
                 all_agent_pos = np.zeros(self.world.dim_p)
                 all_landmark_pos = np.zeros(self.world.dim_p)
             mid_pos = (all_agent_pos + all_landmark_pos)/2

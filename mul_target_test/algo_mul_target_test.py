@@ -47,15 +47,19 @@ ACTION_SPAN = 0.5
 class AgentPolicy:
     def __init__(self,
                  agent_number,
+                 landmark_number,
                  load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_10',
                  n_test_times=6000,
                  boids_rule_1_distance=4.0,
                  boids_rule_2_distance=4.0,
-                 boids_rule_3_distance=2.5
+                 boids_rule_3_distance=2.5,
+                 grouping_ratio=0.5
                  ):
         self.agent_number = agent_number
+        self.landmark_number = landmark_number
         self.load_file = load_file
         self.n_test_times = n_test_times
+        self.grouping_ratio = grouping_ratio
         self.boids_policy = boids_policy(self.agent_number, agent_com_size=4, max_vel=1,
                                          rule_1_distance=boids_rule_1_distance,
                                          rule_2_distance=boids_rule_2_distance,
@@ -85,7 +89,7 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
+            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
         one_agent_boids_policy = self.boids_policy
         now_agent_pos = agent.state.p_pos
         now_agent_vel = agent.state.p_vel
@@ -102,12 +106,28 @@ class AgentPolicy:
         agent, attack_number, agent.com_agent_index, all_pos, \
             all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
             obs_landmarks_feature = obs
+        # 这里首先对检测到的目标进行识别，如果不属于自己管辖的范围，则删除该目标
+        # 这里进行目标识别,这里简单分成两组，以中心为分界线，在中心右侧的为一组，在中心左侧的为一组
+        # 分别对目标的相同分类方式产生关联
+        new_targets = []  # 最终要执行的目标
+        new_targets_feature = []
+        for obs_landmark_index, obs_landmark in enumerate(obs_landmarks):
+            obs_feature = obs_landmarks_feature[obs_landmark_index]
+            # 首先判断agent_index的类别
+            if agent_index >= int(self.grouping_ratio * self.agent_number):
+                if obs_feature >= int(self.grouping_ratio * self.landmark_number):
+                    new_targets.append(obs_landmark)
+                    new_targets_feature.append(obs_feature)
+            else:
+                if obs_feature < int(self.grouping_ratio * self.landmark_number):
+                    new_targets.append(obs_landmark)
+                    new_targets_feature.append(obs_feature)
         if agent.is_destroyed:
             target = agent.attack_goal_pos
             now_pos = agent.state.p_pos
             act = 0.5 * (target - now_pos)
             action = np.array([0, act[0], 0, act[1], 0])
-        elif len(obs_landmarks) == 0:
+        elif len(new_targets) == 0:
             one_agent_boids_policy = self.boids_policy
             now_agent_pos = agent.state.p_pos
             now_agent_vel = agent.state.p_vel
@@ -115,7 +135,7 @@ class AgentPolicy:
                                                                         now_agent_vel, all_vel, time_step)
         else:
             if attack_number == 0:
-                for obs_landmark in obs_landmarks:
+                for obs_index, obs_landmark in enumerate(new_targets):
                     one_agent_rl_policy = self.rl_policy
                     entity_pos = []
                     if len(all_relative_position) == 0:
@@ -133,11 +153,11 @@ class AgentPolicy:
                                                                                       now_agent_vel, all_vel,
                                                                                       time_step)
                     action = [one_agent_rl_policy.get_rl_action(new_obs) + 2 * action_boids,
-                              obs_landmarks_feature,
+                              new_targets_feature[obs_index],
                               agent.index_number]
                     break
             else:
-                for obs_landmark in obs_landmarks:
+                for obs_index, obs_landmark in enumerate(new_targets):
                     if attack_number >= 4:
                         # 当执行攻击的无人机大于4时
                         if not agent.attack:
@@ -155,18 +175,19 @@ class AgentPolicy:
                             now_agent_pos = agent.state.p_pos
                             now_agent_vel = agent.state.p_vel
                             action_boids = one_agent_boids_policy.one_agent_apply_boids_rules(now_agent_pos, all_pos,
-                                                                                             need_dist,
-                                                                                             now_agent_vel, all_vel,
-                                                                                             time_step)
+                                                                                              need_dist,
+                                                                                              now_agent_vel, all_vel,
+                                                                                              time_step)
                             # 只对攻击的无人机继续采用rl策略
                             one_agent_rl_policy = self.rl_policy
                             entity_pos = []
                             mean_other_pos = np.mean(all_attack_agent_position, axis=0)
                             entity_pos.append(obs_landmark - agent.state.p_pos)
+                            # 由于进行了分组,所以在决策的时候，只与相同任务的智能体进行互动即可
                             new_obs = np.concatenate(
                                 [np.array([attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
                             action = [one_agent_rl_policy.get_rl_action(new_obs) + 2 * action_boids,
-                                      obs_landmarks_feature,
+                                      new_targets_feature[obs_index],
                                       agent.index_number]
                             break
                     # 因为通讯距离问题，会有的无人机无法统计到所有的攻击无人机
@@ -179,11 +200,24 @@ class AgentPolicy:
                                                                                     now_agent_vel, all_vel,
                                                                                     time_step)
                         break
+        if action is None:
+            # 保底，采用boids
+            one_agent_boids_policy = self.boids_policy
+            now_agent_pos = agent.state.p_pos
+            now_agent_vel = agent.state.p_vel
+            action = one_agent_boids_policy.one_agent_apply_boids_rules(now_agent_pos, all_pos,
+                                                                        need_dist,
+                                                                        now_agent_vel, all_vel,
+                                                                        time_step)
+
         return action
 
 
-def policy_run(env, number_agent, load_file, need_render):
-    agent_policy = AgentPolicy(agent_number=number_agent, load_file=load_file).init_policy()
+def policy_run(env, number_agent, landmark_number, load_file, need_render, grouping_ratio):
+    agent_policy = AgentPolicy(agent_number=number_agent,
+                               landmark_number=landmark_number,
+                               load_file=load_file,
+                               grouping_ratio=grouping_ratio).init_policy()
     obs_n = env.mpe_env.reset()
     landmark_attack_agent_index_dic_list = []
     landmark_been_attacked_list = []
@@ -208,7 +242,7 @@ def policy_run(env, number_agent, load_file, need_render):
             if len(action) == 3:
                 rl_agent_number += 1
                 rl_act, obs_landmarks_feature, agent_index_number = action
-                landmark_pos = (obs_landmarks_feature[0])  # 使用元组，才可以使用字典
+                landmark_pos = obs_landmarks_feature  # 使用元组，才可以使用字典
                 if rl_act[0] > 0.5:
                     if landmark_attack_agent_index_dic.get(landmark_pos, 0) == 0:
                         landmark_attack_agent_index_dic[landmark_pos] = [agent_index_number]
@@ -219,14 +253,14 @@ def policy_run(env, number_agent, load_file, need_render):
                 real_action.append(copy.deepcopy(action))
         # print(f"landmark_attack_agent_index_dic is {landmark_attack_agent_index_dic}")
         new_obs_n = env.mpe_env.step([real_action, landmark_attack_agent_index_dic, reassign_goals,
-                                      landmark_attack_agent_index_dic_list])
+                                      landmark_attack_agent_index_dic_list, grouping_ratio])
 
         attack_landmarks = list(landmark_attack_agent_index_dic.keys())
         for attack_landmark in attack_landmarks:
             attack_this_landmark_agent_index = landmark_attack_agent_index_dic.get(attack_landmark)
             attack_this_landmark_agent_number = len(attack_this_landmark_agent_index)
 
-            if 1 <= attack_this_landmark_agent_number <= 3:
+            if 1 <= attack_this_landmark_agent_number <= 2:
                 if attack_landmark in landmark_been_attacked_list:
                     # 重分配出现的问题
                     if reassign_goals:
@@ -265,13 +299,15 @@ def policy_run(env, number_agent, load_file, need_render):
     return landmark_attack_agent_index_dic_list
 
 
-def run_mpe(load_file, run_file='simple_search_team', number_agent=8, number_landmark=1, need_render=False):
-    env = mpe_env(run_file, seed=SEED, number_agent=number_agent, number_landmark=number_landmark)
+def run_mpe(load_file, run_file='simple_search_team', number_agent=8,
+            number_landmark=1, need_render=False, grouping_ratio=0.5):
+    env = mpe_env(run_file, seed=SEED, number_agent=number_agent,
+                  number_landmark=number_landmark, grouping_ratio=grouping_ratio)
     return env, number_agent, load_file, need_render
 
 
 if __name__ == '__main__':
-
+    group_ratio = 0.5  # 分成两组的比例
     distributions_logger = Logs(logger_name='distributions_logs', log_file_name='distributions_logs_6_6_17')
     result_logger = Logs(logger_name='result_logs', log_file_name='result_logs_6_6_17')
     for i in range(0, 4):
@@ -283,10 +319,11 @@ if __name__ == '__main__':
             load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_17',
             run_file='simple_mul_target.py', number_agent=number_UAVs,
             number_landmark=number_gaols,
-            need_render=True)
+            need_render=True,
+            grouping_ratio=group_ratio)
         print(f"环境初始化成功,number_UAVs:{number_UAVs},number_gaols:{number_gaols}")
-        for j in range(1):
-            distributions = policy_run(r_env, r_number_agent, r_load_file, r_need_render)
+        for j in range(2):
+            distributions = policy_run(r_env, r_number_agent, number_gaols, r_load_file, r_need_render, group_ratio)
             all_goal_distributions = {}
             for distribution in distributions:
                 for key_index, key_item in enumerate(list(distribution.keys())):
@@ -302,9 +339,13 @@ if __name__ == '__main__':
             # print(distributions)
             str_logs = f"当前轮数{j}_无人机数目{number_UAVs}_目标数目{number_gaols}\n"
             number_agent_attack_mean = 0
-            for key, values in all_goal_distributions.items():
-                str_logs += str(key) + ':' + str(values) + '\n'
-                number_agent_attack_mean += len(values)
+            final_list = list(all_goal_distributions.keys())
+            final_list.sort()
+            for key_index, key in enumerate(final_list):
+                str_logs += str(key) + ':' + str(all_goal_distributions.get(key)) + '\n'
+                if group_ratio * number_gaols - 1 == key:
+                    str_logs += "-----------------------------------------------" + '\n'
+                number_agent_attack_mean += len(all_goal_distributions.get(key))
             # 得到一轮测试每个目标的平均攻击数目
             number_agent_attack_mean /= number_gaols
             all_number_agent_attack_mean.append(number_agent_attack_mean)
