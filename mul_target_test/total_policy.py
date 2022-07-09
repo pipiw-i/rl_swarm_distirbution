@@ -1,20 +1,14 @@
-# -*- coding: utf-8 -*-
-# @Time : 2022/6/7 下午13:18
+# -*-coding:utf-8-*-
+# @Time : 2022/7/9 下午22:36
 # @Author :  wangshulei
-# @FileName: algo_mul_target_test.py
+# @FileName: total_policy.py
 # @Software: PyCharm
-import copy
 
 import numpy as np
-from tqdm import tqdm
-
 from mul_target_test.RL_policy import RL_policy
 from mul_target_test.boids_policy import boids_policy
 from mul_target_test.logs import Logs
-from mul_target_test.mpe_mul_target_env import mpe_env
 
-SEED = 65535
-ACTION_SPAN = 0.5
 """
 最终效果应该是每个智能体都有一份完全相同的策略，该策略包含rl策略，boids搜索策略，智能体可以根据通讯以及自身的信息，来做出决策
 每个智能体的通讯内容：
@@ -89,7 +83,7 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
+        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
         one_agent_boids_policy = self.boids_policy
         now_agent_pos = agent.state.p_pos
         now_agent_vel = agent.state.p_vel
@@ -104,8 +98,8 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
-            obs_landmarks_feature = obs
+        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
+        obs_landmarks_feature, _ = obs
         # 这里首先对检测到的目标进行识别，如果不属于自己管辖的范围，则删除该目标
         # 这里进行目标识别,这里简单分成两组，以中心为分界线，在中心右侧的为一组，在中心左侧的为一组
         # 分别对目标的相同分类方式产生关联
@@ -211,152 +205,3 @@ class AgentPolicy:
                                                                         time_step)
 
         return action
-
-
-def policy_run(env, number_agent, landmark_number, load_file, need_render, grouping_ratio):
-    agent_policy = AgentPolicy(agent_number=number_agent,
-                               landmark_number=landmark_number,
-                               load_file=load_file,
-                               grouping_ratio=grouping_ratio).init_policy()
-    obs_n = env.mpe_env.reset()
-    landmark_attack_agent_index_dic_list = []
-    landmark_been_attacked_list = []
-    reassign_goals = False
-    gaols_finish = False
-    agent_finish = False
-    for t in tqdm(range(1000)):
-        # 决策攻击的无人机
-        if need_render:
-            env.mpe_env.render()
-        action_n = []
-        for agent_index in range(number_agent):
-            action_n.append(copy.deepcopy(agent_policy[agent_index](obs=obs_n[agent_index],
-                                                                    time_step=t,
-                                                                    agent_index=agent_index)))
-        # 统计部分，根据action统计每个目标所攻击的无人机编号
-        rl_agent_number = 0
-        landmark_attack_agent_index_dic = {}
-        real_action = []
-        for action in action_n:
-            # 说明该部分是由rl产生的
-            if len(action) == 3:
-                rl_agent_number += 1
-                # 统计所有攻击决策的无人机
-                rl_act, obs_landmarks_feature, agent_index_number = action
-                landmark_pos = obs_landmarks_feature  # 使用元组，才可以使用字典
-                if rl_act[0] > 0.5:
-                    if landmark_attack_agent_index_dic.get(landmark_pos, 0) == 0:
-                        landmark_attack_agent_index_dic[landmark_pos] = [agent_index_number]
-                    else:
-                        landmark_attack_agent_index_dic[landmark_pos].append(agent_index_number)
-                real_action.append(copy.deepcopy(rl_act))
-            else:
-                real_action.append(copy.deepcopy(action))
-        # print(f"landmark_attack_agent_index_dic is {landmark_attack_agent_index_dic}")
-        new_obs_n = env.mpe_env.step([real_action, landmark_attack_agent_index_dic, reassign_goals,
-                                      landmark_attack_agent_index_dic_list, grouping_ratio])
-
-        attack_landmarks = list(landmark_attack_agent_index_dic.keys())
-        for attack_landmark in attack_landmarks:
-            attack_this_landmark_agent_index = landmark_attack_agent_index_dic.get(attack_landmark)
-            attack_this_landmark_agent_number = len(attack_this_landmark_agent_index)
-
-            if 1 <= attack_this_landmark_agent_number <= 2:
-                if attack_landmark in landmark_been_attacked_list:
-                    # 重分配出现的问题
-                    if reassign_goals:
-                        # 记录重分配的次数，如果次数过多，那么就适当放宽条件
-                        for ind, landmark_item in enumerate(landmark_been_attacked_list):
-                            if attack_landmark == landmark_item:
-                                if 0 < len(attack_this_landmark_agent_index) <= 1:
-                                    # 限制为1-2
-                                    for a_i in attack_this_landmark_agent_index:
-                                        # 防止重复
-                                        if a_i in landmark_attack_agent_index_dic_list[ind][attack_landmark]:
-                                            continue
-                                        else:
-                                            landmark_attack_agent_index_dic_list[ind][attack_landmark].append(a_i)
-                                else:
-                                    continue
-                    continue
-                else:
-                    landmark_been_attacked_list.append(attack_landmark)
-                    landmark_attack_agent_index_dic_list.append({attack_landmark: attack_this_landmark_agent_index})
-        obs_n = new_obs_n
-        if len(landmark_attack_agent_index_dic_list) == number_gaols:
-            gaols_finish = True
-        destroyed_number_count = 0
-        for a, _, _, _, _, _, _, _, _, _ in new_obs_n:
-            if a.is_destroyed:
-                destroyed_number_count += 1
-        if destroyed_number_count == number_agent:
-            agent_finish = True
-        if agent_finish:
-            pass
-        elif gaols_finish and not agent_finish:
-            # print("现在进行重分配")
-            reassign_goals = True
-
-    return landmark_attack_agent_index_dic_list
-
-
-def run_mpe(load_file, run_file='simple_search_team', number_agent=8,
-            number_landmark=1, need_render=False, grouping_ratio=0.5):
-    env = mpe_env(run_file, seed=SEED, number_agent=number_agent,
-                  number_landmark=number_landmark, grouping_ratio=grouping_ratio)
-    return env, number_agent, load_file, need_render
-
-
-if __name__ == '__main__':
-    group_ratio = 0.5  # 分成两组的比例
-    distributions_logger = Logs(logger_name='distributions_logs', log_file_name='distributions_logs_6_6_17')
-    result_logger = Logs(logger_name='result_logs', log_file_name='result_logs_6_6_17')
-    for i in range(0, 4):
-        all_distributions = {}
-        number_UAVs = 8 + 8 * i
-        number_gaols = 4 + 4 * i
-        all_number_agent_attack_mean = []
-        r_env, r_number_agent, r_load_file, r_need_render = run_mpe(
-            load_file='../distribution_policy/run_distribution_e3_syn_para_double_random_6_6_17',
-            run_file='simple_mul_target.py', number_agent=number_UAVs,
-            number_landmark=number_gaols,
-            need_render=True,
-            grouping_ratio=group_ratio)
-        print(f"环境初始化成功,number_UAVs:{number_UAVs},number_gaols:{number_gaols}")
-        for j in range(2):
-            distributions = policy_run(r_env, r_number_agent, number_gaols, r_load_file, r_need_render, group_ratio)
-            all_goal_distributions = {}
-            for distribution in distributions:
-                for key_index, key_item in enumerate(list(distribution.keys())):
-                    if all_goal_distributions.get(key_item, 0) == 0:
-                        all_goal_distributions[key_item] = copy.deepcopy(distribution.get(key_item))
-                    else:
-                        for agent_index in distribution.get(key_item):
-                            if agent_index in all_goal_distributions[key_item]:
-                                continue
-                            else:
-                                all_goal_distributions[key_item].append(agent_index)
-            # 统计这个轮次的平均值以及每个回合的分布情况
-            # print(distributions)
-            str_logs = f"当前轮数{j}_无人机数目{number_UAVs}_目标数目{number_gaols}\n"
-            number_agent_attack_mean = 0
-            final_list = list(all_goal_distributions.keys())
-            final_list.sort()
-            for key_index, key in enumerate(final_list):
-                str_logs += str(key) + ':' + str(all_goal_distributions.get(key)) + '\n'
-                if group_ratio * number_gaols - 1 == key:
-                    str_logs += "-----------------------------------------------" + '\n'
-                number_agent_attack_mean += len(all_goal_distributions.get(key))
-            # 得到一轮测试每个目标的平均攻击数目
-            number_agent_attack_mean /= number_gaols
-            all_number_agent_attack_mean.append(number_agent_attack_mean)
-            distributions_logger.add_logs(str_logs)
-        str_logs = f"result_{number_UAVs}_{number_gaols}_50_times\n"
-        mean_50 = 0
-        for times, one_number_agent_attack_mean in enumerate(all_number_agent_attack_mean):
-            str_logs += f"当前轮数{times},平均攻击次数{one_number_agent_attack_mean}\n"
-            mean_50 += one_number_agent_attack_mean
-        mean_50 /= 50
-        str_logs += f"在无人机数目{number_UAVs}目标数目{number_gaols}下，平均攻击次数为{mean_50}\n"
-        result_logger.add_logs(str_logs)
-    print("程序运行完毕！")

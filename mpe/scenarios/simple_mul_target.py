@@ -342,7 +342,7 @@ class Scenario(BaseScenario):
         obs = np.concatenate([np.array([self.attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
         return obs
 
-    def test_observation(self, agent, world):
+    def test_observation(self, agent, world, reassign_goals):
         # 这里选取能够观测到的智能体,obs_landmarks 内就是当前智能体与他直接联系的智能体所能够观测到的障碍物
         if agent.attack:
             agent.is_decided = True
@@ -403,6 +403,25 @@ class Scenario(BaseScenario):
         if len(obs_landmarks) == 0:
             # 不能直接检测到目标，不统计周围的攻击数目
             attack_number = 0
+        # 在这里更改决策终止条件，当这个智能体本身的通讯发现其攻击个数在合适范围的时候，就会发出信号，停止下一次迭代更新
+        if reassign_goals:
+            offset = 1
+        else:
+            offset = 0
+        if 1 - offset <= attack_number <= 2 - offset and agent.attack and not agent.is_destroyed:
+            return_obs_landmarks_feature = []
+            if agent.index_number < int(self.grouping_ratio * self.num_agents):
+                for obs_landmarks_feature_i in obs_landmarks_feature:
+                    if obs_landmarks_feature_i < int(self.grouping_ratio * self.num_landmarks):
+                        return_obs_landmarks_feature.append(obs_landmarks_feature_i)
+
+            else:
+                for obs_landmarks_feature_i in obs_landmarks_feature:
+                    if obs_landmarks_feature_i >= int(self.grouping_ratio * self.num_landmarks):
+                        return_obs_landmarks_feature.append(obs_landmarks_feature_i)
+            continue_decide_msg = [True, agent, return_obs_landmarks_feature]
+        else:
+            continue_decide_msg = [False]
         str_logs = f"当前智能体编号:{agent.index_number}\n " \
                    f"是否正在攻击:{agent.attack}\n " \
                    f"该无人机是否已经摧毁:{agent.is_destroyed}\n" \
@@ -423,4 +442,4 @@ class Scenario(BaseScenario):
                 agent.attack_goal_pos = landmark.state.p_pos
         return [agent, attack_number, agent.com_agent_index, all_pos,
                 all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks,
-                obs_landmarks_feature]
+                obs_landmarks_feature, continue_decide_msg]

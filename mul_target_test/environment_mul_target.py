@@ -96,7 +96,7 @@ class MultiAgentEnv(gym.Env):
                 self.action_space.append(total_action_space[0])
 
             # observation space
-            obs_dim = len(observation_callback(agent, self.world))
+            obs_dim = len(observation_callback(agent, self.world, False))
             share_obs_dim += obs_dim
             self.observation_space.append(spaces.Box(
                 low=-np.inf, high=+np.inf, shape=(obs_dim,), dtype=np.float32))  # [-inf,inf]
@@ -121,9 +121,8 @@ class MultiAgentEnv(gym.Env):
 
     # step  this is  env.step()
     def step(self, action_n_landmark_attack_agent_index_dic):
-        action_n, landmark_attack_agent_index_dic, reassign_goals, \
-            landmark_attack_agent_index_dic_list,grouping_ratio = action_n_landmark_attack_agent_index_dic
-        attack_landmarks = list(landmark_attack_agent_index_dic.keys())
+        action_n, reassign_goals, \
+            landmark_attack_agent_index_dic_list, grouping_ratio = action_n_landmark_attack_agent_index_dic
         all_landmarks = self.world.landmarks
         self.agents = self.world.policy_agents
         # 根据对目标物的攻击，更改目标以及无人机的状态
@@ -216,7 +215,7 @@ class MultiAgentEnv(gym.Env):
         self.world.step()  # core.step()  更新执行动作后的坐标
         # record observation for each agent
         for i, agent in enumerate(self.agents):
-            obs_n.append(self._get_obs(agent))
+            obs_n.append(self._get_obs(agent, reassign_goals))
         return obs_n
 
     def reset(self):
@@ -230,7 +229,7 @@ class MultiAgentEnv(gym.Env):
         self.agents = self.world.policy_agents
         self._get_landmark_pos()
         for agent in self.agents:
-            obs_n.append(self._get_obs(agent))
+            obs_n.append(self._get_obs(agent, False))
         return obs_n
 
     # get info used for benchmarking
@@ -240,10 +239,10 @@ class MultiAgentEnv(gym.Env):
         return self.info_callback(agent, self.world)
 
     # get observation for a particular agent
-    def _get_obs(self, agent):
+    def _get_obs(self, agent, reassign_goals):
         if self.observation_callback is None:
             return np.zeros(0)
-        return self.observation_callback(agent, self.world)
+        return self.observation_callback(agent, self.world, reassign_goals)
 
     # 获取攻击个数
     def _get_attack_number(self):
