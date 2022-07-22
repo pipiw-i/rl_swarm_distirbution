@@ -14,12 +14,14 @@ class mpe_env:
                  seed,
                  number_agent,
                  number_landmark,
+                 need_search_agent,
                  grouping_ratio):
         self.mpe_env_name = mpe_env_name
         self.seed = seed
+        self.need_search_agent = need_search_agent
         self.number_agent = number_agent
         self.number_landmark = number_landmark
-        self.grouping_ratio = grouping_ratio
+        self.grouping_ratio = grouping_ratio  # 分组比例
         self.world = None
         self.scenario = None
         self.mpe_env = self.env_init()
@@ -31,7 +33,8 @@ class mpe_env:
         self.world = self.scenario.make_world()
 
         # create multiagent environment
-        env = MultiAgentEnv(self.world, self.scenario.reset_world, reward_callback=None,
+        env = MultiAgentEnv(self.world, self.need_search_agent, self.scenario.reset_world,
+                            reward_callback=None,
                             observation_callback=self.scenario.test_observation,
                             info_callback=None, land_callback=self.scenario.get_obs_landmarks_pos,
                             get_attack_number_callback=self.scenario.get_attack_number,

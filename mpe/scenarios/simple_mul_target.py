@@ -126,7 +126,7 @@ class Scenario(BaseScenario):
             landmark.feature = i
             self.other_landmark_pos.append(copy.deepcopy(landmark.state.p_pos))
         world.assign_rl_agent_colors(self.grouping_ratio)
-        world.assign_landmark_colors(self.grouping_ratio)
+        world.assign_rl_landmark_colors(self.grouping_ratio)
 
     def set_agent_landmark_numbers(self, agent_numbers, landmark_numbers, grouping_ratio):
         self.num_agents = agent_numbers
@@ -196,48 +196,65 @@ class Scenario(BaseScenario):
         r_obs_landmarks = copy.deepcopy(obs_landmarks)
         return r_obs_landmarks
 
-    def get_landmark_from_feature(self, agent, world):
+    def get_landmark_from_feature(self, agent, world, need_search_agent):
         obs_landmarks = []
-        for ag in world.agents:
-            if ag == agent:
-                for ag_landmark_feature in ag.landmark_feature:
-                    if_exist = False
-                    for obs_landmark in obs_landmarks:
-                        if ag_landmark_feature == obs_landmark:
-                            if_exist = True
-                    if not if_exist:
-                        for new_ag_landmark_feature in ag.landmark_feature:
-                            obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
-            # 可以联系上的智能体,这里是能够直接联系的智能体，不考虑间接联系
-            elif int(ag.name[-1]) in agent.com_agent_index:
-                for ag_landmark_feature in ag.landmark_feature:
-                    if_exist = False
-                    for obs_landmark in obs_landmarks:
-                        if ag_landmark_feature == obs_landmark:
-                            if_exist = True
-                    if not if_exist:
-                        for new_ag_landmark_feature in ag.landmark_feature:
-                            obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
-        if obs_landmarks:  # obs_landmarks 所有智能体能够检测到的目标
-            for obs_landmark in obs_landmarks:
-                is_exist = False
-                for landmark_get in self.landmark_get:
-                    if obs_landmark == landmark_get:
-                        is_exist = True
-                        continue
-                if not is_exist:
-                    self.landmark_get.append(copy.deepcopy(obs_landmark))
-        if self.landmark_get:
-            for a in world.agents:
-                a.history_landmark_position = self.landmark_get
-        # print(f"self.landmark_get is {self.landmark_get}")
-        obs_landmarks.sort()
-        r_obs_landmarks = copy.deepcopy(obs_landmarks)
-        r_obs_landmarks_pos = []
-        for landmark in world.landmarks:
-            if landmark.feature in r_obs_landmarks:
-                r_obs_landmarks_pos.append(copy.deepcopy(landmark.state.p_pos))
-        return r_obs_landmarks_pos, r_obs_landmarks
+        if need_search_agent:
+            r_obs_landmarks_pos = []
+            for landmark in world.landmarks:
+                if landmark.been_attacked:
+                    continue
+                if agent.index_number < int(self.grouping_ratio * self.num_agents):
+                    if landmark.feature < int(self.grouping_ratio * self.num_landmarks):
+                        r_obs_landmarks_pos.append(copy.deepcopy(landmark.state.p_pos))
+                        obs_landmarks.append(landmark.feature)
+                else:
+                    if landmark.feature >= int(self.grouping_ratio * self.num_landmarks):
+                        r_obs_landmarks_pos.append(copy.deepcopy(landmark.state.p_pos))
+                        obs_landmarks.append(landmark.feature)
+            obs_landmarks.sort()
+            r_obs_landmarks = copy.deepcopy(obs_landmarks)
+            return r_obs_landmarks_pos, r_obs_landmarks
+        else:
+            for ag in world.agents:
+                if ag == agent:
+                    for ag_landmark_feature in ag.landmark_feature:
+                        if_exist = False
+                        for obs_landmark in obs_landmarks:
+                            if ag_landmark_feature == obs_landmark:
+                                if_exist = True
+                        if not if_exist:
+                            for new_ag_landmark_feature in ag.landmark_feature:
+                                obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
+                # 可以联系上的智能体,这里是能够直接联系的智能体，不考虑间接联系
+                elif int(ag.name[-1]) in agent.com_agent_index:
+                    for ag_landmark_feature in ag.landmark_feature:
+                        if_exist = False
+                        for obs_landmark in obs_landmarks:
+                            if ag_landmark_feature == obs_landmark:
+                                if_exist = True
+                        if not if_exist:
+                            for new_ag_landmark_feature in ag.landmark_feature:
+                                obs_landmarks.append(copy.deepcopy(new_ag_landmark_feature))
+            if obs_landmarks:  # obs_landmarks 所有智能体能够检测到的目标
+                for obs_landmark in obs_landmarks:
+                    is_exist = False
+                    for landmark_get in self.landmark_get:
+                        if obs_landmark == landmark_get:
+                            is_exist = True
+                            continue
+                    if not is_exist:
+                        self.landmark_get.append(copy.deepcopy(obs_landmark))
+            if self.landmark_get:
+                for a in world.agents:
+                    a.history_landmark_position = self.landmark_get
+            # print(f"self.landmark_get is {self.landmark_get}")
+            obs_landmarks.sort()
+            r_obs_landmarks = copy.deepcopy(obs_landmarks)
+            r_obs_landmarks_pos = []
+            for landmark in world.landmarks:
+                if landmark.feature in r_obs_landmarks:
+                    r_obs_landmarks_pos.append(copy.deepcopy(landmark.state.p_pos))
+            return r_obs_landmarks_pos, r_obs_landmarks
 
     def reward(self, agent, world):
         rew = 0
@@ -342,7 +359,7 @@ class Scenario(BaseScenario):
         obs = np.concatenate([np.array([self.attack_number])] + [agent.state.p_pos] + [mean_other_pos] + entity_pos)
         return obs
 
-    def test_observation(self, agent, world, reassign_goals):
+    def test_observation(self, agent, world, reassign_goals, need_search_agent):
         # 这里选取能够观测到的智能体,obs_landmarks 内就是当前智能体与他直接联系的智能体所能够观测到的障碍物
         if agent.attack:
             agent.is_decided = True
@@ -351,7 +368,7 @@ class Scenario(BaseScenario):
             agent.now_goal = None
         if not agent.is_decided:
             # obs_landmarks = self.get_landmark(agent, world)
-            obs_landmarks, obs_landmarks_feature = self.get_landmark_from_feature(agent, world)
+            obs_landmarks, obs_landmarks_feature = self.get_landmark_from_feature(agent, world, need_search_agent)
             if len(obs_landmarks) > 2:
                 # np.sort(obs_landmarks)  # 采用相同的算法，使得每个智能体观测到的多个目标能够顺序一致
                 agent.now_goal = [copy.deepcopy(obs_landmarks[0])]
@@ -388,7 +405,7 @@ class Scenario(BaseScenario):
                 all_relative_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))
                 # 区分目标,统计相同目标的rl观测参数，包括攻击数目，攻击无人机的位置，以及自身的位置，目标位置(这里是全部的)
                 if agent.index_number >= int(self.grouping_ratio * self.num_agents):
-                    if w_agent.index_number >= self.num_agents // 2:
+                    if w_agent.index_number >= int(self.grouping_ratio * self.num_agents):
                         if w_agent.attack:
                             attack_number += 1
                             all_attack_agent_position.append(copy.deepcopy(w_agent.state.p_pos - agent.state.p_pos))

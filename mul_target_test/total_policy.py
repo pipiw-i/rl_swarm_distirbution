@@ -46,7 +46,7 @@ class AgentPolicy:
                  n_test_times=6000,
                  boids_rule_1_distance=4.0,
                  boids_rule_2_distance=4.0,
-                 boids_rule_3_distance=2.5,
+                 boids_rule_3_distance=1.5,
                  grouping_ratio=0.5
                  ):
         self.agent_number = agent_number
@@ -54,11 +54,13 @@ class AgentPolicy:
         self.load_file = load_file
         self.n_test_times = n_test_times
         self.grouping_ratio = grouping_ratio
+        # 设计boids的参数
         self.boids_policy = boids_policy(self.agent_number, agent_com_size=4, max_vel=1,
                                          rule_1_distance=boids_rule_1_distance,
                                          rule_2_distance=boids_rule_2_distance,
                                          rule_3_distance=boids_rule_3_distance
                                          )
+        # 设计强化学习策略参数
         self.rl_policy = RL_policy(load_file=self.load_file,
                                    agent_index=0,
                                    n_test_times=self.n_test_times)
@@ -83,7 +85,7 @@ class AgentPolicy:
         """
         action = None
         agent, attack_number, agent.com_agent_index, all_pos, \
-        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
+            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks = obs
         one_agent_boids_policy = self.boids_policy
         now_agent_pos = agent.state.p_pos
         now_agent_vel = agent.state.p_vel
@@ -97,17 +99,26 @@ class AgentPolicy:
         :return: 单一智能体的策略函数
         """
         action = None
+        # 该obs内的内容完全为部分观测内容。
+        # agent 智能体本身的一些参数
+        # attack_number 周围的攻击个数
+        # agent.com_agent_index 能够通讯的智能体编号
+        # all_pos 能够通讯的智能体位置
+        # all_relative_position 强化学习观测值所用到的关联位置，用来计算平均位置（未攻击时，初始决策时）
+        # all_attack_agent_position  强化学习观测值所用到的关联位置，用来计算平均位置（攻击时，迭代时）
+        # need_dist boids需要的距离信息
+        # all_vel boids需要的速度信息
+        # obs_landmarks 当前目标所在的位置
+        # obs_landmarks_feature 当前目标的标识
         agent, attack_number, agent.com_agent_index, all_pos, \
-        all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
-        obs_landmarks_feature, _ = obs
-        # 这里首先对检测到的目标进行识别，如果不属于自己管辖的范围，则删除该目标
-        # 这里进行目标识别,这里简单分成两组，以中心为分界线，在中心右侧的为一组，在中心左侧的为一组
-        # 分别对目标的相同分类方式产生关联
+            all_relative_position, all_attack_agent_position, need_dist, all_vel, obs_landmarks, \
+            obs_landmarks_feature, _ = obs
+        # 这里首先对检测到的目标进行识别，如果不属于自己管辖的范围，则删除该目标，涉及到分组的问题
         new_targets = []  # 最终要执行的目标
         new_targets_feature = []
         for obs_landmark_index, obs_landmark in enumerate(obs_landmarks):
             obs_feature = obs_landmarks_feature[obs_landmark_index]
-            # 首先判断agent_index的类别
+            # 首先判断agent_index的类别，即分组情况
             if agent_index >= int(self.grouping_ratio * self.agent_number):
                 if obs_feature >= int(self.grouping_ratio * self.landmark_number):
                     new_targets.append(obs_landmark)
@@ -116,11 +127,13 @@ class AgentPolicy:
                 if obs_feature < int(self.grouping_ratio * self.landmark_number):
                     new_targets.append(obs_landmark)
                     new_targets_feature.append(obs_feature)
+        # 智能体已经被毁坏了，即以及对目标发起过了攻击，那么使其追踪目标。
         if agent.is_destroyed:
             target = agent.attack_goal_pos
             now_pos = agent.state.p_pos
             act = 0.5 * (target - now_pos)
             action = np.array([0, act[0], 0, act[1], 0])
+        # 未检测到目标，则采取boids编队
         elif len(new_targets) == 0:
             one_agent_boids_policy = self.boids_policy
             now_agent_pos = agent.state.p_pos
@@ -129,6 +142,7 @@ class AgentPolicy:
                                                                         now_agent_vel, all_vel, time_step)
         else:
             if attack_number == 0:
+                # 只处理目标中的第一个,因为一次只能打击一个目标
                 for obs_index, obs_landmark in enumerate(new_targets):
                     one_agent_rl_policy = self.rl_policy
                     entity_pos = []
@@ -142,10 +156,12 @@ class AgentPolicy:
                     one_agent_boids_policy = self.boids_policy
                     now_agent_pos = agent.state.p_pos
                     now_agent_vel = agent.state.p_vel
+                    # 先得到boids动作
                     action_boids = one_agent_boids_policy.one_agent_apply_boids_rules(now_agent_pos, all_pos,
                                                                                       need_dist,
                                                                                       now_agent_vel, all_vel,
                                                                                       time_step)
+                    # 依据强化学习的观测值，得到强化学习的动作，得出综合动作
                     action = [one_agent_rl_policy.get_rl_action(new_obs) + 2 * action_boids,
                               new_targets_feature[obs_index],
                               agent.index_number]
@@ -153,7 +169,7 @@ class AgentPolicy:
             else:
                 for obs_index, obs_landmark in enumerate(new_targets):
                     if attack_number >= 4:
-                        # 当执行攻击的无人机大于4时
+                        # 当执行攻击的无人机大于4时，即数目过多时
                         if not agent.attack:
                             # 如果当前的无人机不是攻击，执行boids
                             one_agent_boids_policy = self.boids_policy
@@ -165,6 +181,7 @@ class AgentPolicy:
                                                                                         time_step)
                             break
                         else:
+                            # 对于正在执行攻击的无人机采用强化学习策略
                             one_agent_boids_policy = self.boids_policy
                             now_agent_pos = agent.state.p_pos
                             now_agent_vel = agent.state.p_vel

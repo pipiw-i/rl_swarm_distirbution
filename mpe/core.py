@@ -243,7 +243,16 @@ class World(object):
                 agent.color = np.array([0., 1., 1.])
 
     # landmark color
-    def assign_landmark_colors(self, grouping_ratio):
+    def assign_landmark_colors(self):
+        for landmark in self.landmarks:
+            landmark.color = np.array([0.25, 0.25, 0.25])
+        for landmark in self.landmarks:
+            landmark.color_list = [np.array([1, 1, 1]),
+                                   np.array([0., 0., 0.]),
+                                   np.array([0., 0., 0.]),
+                                   np.array([0., 0., 0.])]
+
+    def assign_rl_landmark_colors(self, grouping_ratio):
         for landmark in self.landmarks:
             landmark.color = np.array([0.25, 0.25, 0.25])
         for landmark in self.landmarks:

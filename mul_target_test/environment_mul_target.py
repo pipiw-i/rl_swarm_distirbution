@@ -17,12 +17,13 @@ class MultiAgentEnv(gym.Env):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, world, reset_callback=None, reward_callback=None,
+    def __init__(self, world, need_search_agent=False, reset_callback=None, reward_callback=None,
                  observation_callback=None, info_callback=None,
                  done_callback=None, post_step_callback=None, land_callback=None,
                  get_attack_number_callback=None,
                  shared_viewer=True, discrete_action=True):
-
+        # 全局的探索智能体
+        self.need_search_agent = need_search_agent
         self.world = world
         self.world_length = self.world.world_length
         self.current_step = 0
@@ -96,7 +97,7 @@ class MultiAgentEnv(gym.Env):
                 self.action_space.append(total_action_space[0])
 
             # observation space
-            obs_dim = len(observation_callback(agent, self.world, False))
+            obs_dim = len(observation_callback(agent, self.world, False, self.need_search_agent))
             share_obs_dim += obs_dim
             self.observation_space.append(spaces.Box(
                 low=-np.inf, high=+np.inf, shape=(obs_dim,), dtype=np.float32))  # [-inf,inf]
@@ -122,7 +123,7 @@ class MultiAgentEnv(gym.Env):
     # step  this is  env.step()
     def step(self, action_n_landmark_attack_agent_index_dic):
         action_n, reassign_goals, \
-            landmark_attack_agent_index_dic_list, grouping_ratio = action_n_landmark_attack_agent_index_dic
+        landmark_attack_agent_index_dic_list, grouping_ratio = action_n_landmark_attack_agent_index_dic
         all_landmarks = self.world.landmarks
         self.agents = self.world.policy_agents
         # 根据对目标物的攻击，更改目标以及无人机的状态
@@ -215,7 +216,7 @@ class MultiAgentEnv(gym.Env):
         self.world.step()  # core.step()  更新执行动作后的坐标
         # record observation for each agent
         for i, agent in enumerate(self.agents):
-            obs_n.append(self._get_obs(agent, reassign_goals))
+            obs_n.append(self._get_obs(agent, reassign_goals, self.need_search_agent))
         return obs_n
 
     def reset(self):
@@ -229,7 +230,7 @@ class MultiAgentEnv(gym.Env):
         self.agents = self.world.policy_agents
         self._get_landmark_pos()
         for agent in self.agents:
-            obs_n.append(self._get_obs(agent, False))
+            obs_n.append(self._get_obs(agent, False, self.need_search_agent))
         return obs_n
 
     # get info used for benchmarking
@@ -239,10 +240,10 @@ class MultiAgentEnv(gym.Env):
         return self.info_callback(agent, self.world)
 
     # get observation for a particular agent
-    def _get_obs(self, agent, reassign_goals):
+    def _get_obs(self, agent, reassign_goals, need_search_agent):
         if self.observation_callback is None:
             return np.zeros(0)
-        return self.observation_callback(agent, self.world, reassign_goals)
+        return self.observation_callback(agent, self.world, reassign_goals, need_search_agent)
 
     # 获取攻击个数
     def _get_attack_number(self):
@@ -389,13 +390,14 @@ class MultiAgentEnv(gym.Env):
 
             # geom = rendering.Line(start=(0.0, 0.0), end=(1.0, 0.0))
             # self.render_geoms.append(geom)
-
+            agent_size = 0
             for entity in self.world.entities:  # 对于所有的物体，包括智能体以及障碍物
                 geom = None
                 xform = None
                 entity_comm_geoms = []
                 if 'agent' in entity.name:
                     geom = rendering.make_circle(1.5 * entity.size)  # 画一个size大小的圆
+                    agent_size = 1.5 * entity.size
                     xform = rendering.Transform()  # 建立一个位置的映射，使画在中心的圆能够映射到
                     # 探索区域
                     geom_search = rendering.make_circle(entity.search_size, filled=False)
@@ -445,6 +447,11 @@ class MultiAgentEnv(gym.Env):
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
                 self.comm_geoms.append(entity_comm_geoms)
+            # 增加一个探索智能体，这个智能体有很大的通讯以及探索视野，这里就是直接设置为无限即可
+            if self.need_search_agent:
+                search_agent_geom = rendering.make_triangle(1.5 * agent_size)
+                self.render_geoms.append(search_agent_geom)
+            # 画一个size大小的圆
             for wall in self.world.walls:
                 corners = ((wall.axis_pos - 0.5 * wall.width, wall.endpoints[0]),
                            (wall.axis_pos - 0.5 *
@@ -455,6 +462,7 @@ class MultiAgentEnv(gym.Env):
                 if wall.orient == 'H':
                     corners = tuple(c[::-1] for c in corners)
                 geom = rendering.make_polygon(corners)
+
                 if wall.hard:
                     geom.set_color(*wall.color)
                 else:
@@ -493,8 +501,9 @@ class MultiAgentEnv(gym.Env):
             else:
                 all_agent_pos = np.zeros(self.world.dim_p)
                 all_landmark_pos = np.zeros(self.world.dim_p)
-            mid_pos = (all_agent_pos + all_landmark_pos)/2
+            mid_pos = (all_agent_pos + all_landmark_pos) / 2
             mid_pos_range = np.sqrt(np.sum(np.square(all_agent_pos - all_landmark_pos)))
+            # 这里设计变化的视角，方便展示
             if i == 0:
                 self.viewers[i].set_bounds(mid_pos[0] - max(0.5 * mid_pos_range, 1.5 * cam_range),
                                            mid_pos[0] + max(0.5 * mid_pos_range, 1.5 * cam_range),
