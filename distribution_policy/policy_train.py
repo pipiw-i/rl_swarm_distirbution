@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # @Time : 2022/6/2 下午2:45
 # @Author :  wangshulei
-# @FileName: policy_test.py
+# @FileName: policy_train.py
 # @Software: PyCharm
 """
-policy 测试文件
+强化学习policy训练文件，run 这个文件开始训练
 """
 import copy
 import datetime
@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from distribution_policy.distri_exp import SharedExp
 from distribution_policy.distri_policy import maddpg_policy
 from distribution_policy.mpe_env import mpe_env
-from distribution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
+from distrzhuibution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
 
 SEED = 65535
 ACTION_SPAN = 0.5
