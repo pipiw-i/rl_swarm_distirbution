@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: mpe_env_s.py
 # @Software: PyCharm
+"""
+分布式奖励环境仿真
+"""
 import mpe.scenarios as scenarios
 from mpe.environment_distribution_s_reward import MultiAgentEnv
 from script.utils import space_n_to_shape_n

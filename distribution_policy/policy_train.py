@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from distribution_policy.distri_exp import SharedExp
 from distribution_policy.distri_policy import maddpg_policy
 from distribution_policy.mpe_env import mpe_env
-from distrzhuibution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
+from distribution_policy.mpe_env_s import mpe_env as mpe_env_s_reward
 
 SEED = 65535
 ACTION_SPAN = 0.5

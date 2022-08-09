@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: algo_mul_target_test.py
 # @Software: PyCharm
+"""
+老版本的策略执行文件
+"""
 import copy
 
 import numpy as np

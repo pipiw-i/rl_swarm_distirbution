@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: algo_mul_target_test.py
 # @Software: PyCharm
+"""
+完全部分可观测的多目标测试文件
+"""
 import copy
 
 from tqdm import tqdm

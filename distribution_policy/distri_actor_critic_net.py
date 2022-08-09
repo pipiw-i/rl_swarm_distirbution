@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: distri_actor_critic_net.py
 # @Software: PyCharm
+"""
+actor critic 网络结构文件
+"""
 import tensorflow as tf
 import numpy as np
 

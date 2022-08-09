@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: distri_policy.py
 # @Software: PyCharm
+"""
+选择动作以及策略文件
+"""
 import os
 
 import numpy as np

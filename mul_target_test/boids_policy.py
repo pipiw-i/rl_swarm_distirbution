@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: boids_policy.py
 # @Software: PyCharm
+"""
+boids策略
+"""
 import copy
 import math
 

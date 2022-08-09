@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: distri_policy.py
 # @Software: PyCharm
+"""
+多目标策略
+"""
 import tensorflow as tf
 
 from distribution_policy.distri_actor_critic_net import test_actor as actor

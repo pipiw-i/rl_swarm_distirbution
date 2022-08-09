@@ -3,6 +3,9 @@
 # @Author :  wangshulei
 # @FileName: mpe_env.py
 # @Software: PyCharm
+"""
+环境仿真
+"""
 import mpe.scenarios as scenarios
 from mpe.environment_distribution import MultiAgentEnv
 from script.utils import space_n_to_shape_n
